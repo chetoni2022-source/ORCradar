@@ -67,13 +67,16 @@ export default function App() {
     return () => { alive = false; unsub(); };
   }, []);
 
+  // Verifica owner apenas quando o USUÁRIO muda (não a cada refresh de token).
+  // Sem isso, voltar pra aba disparava onAuthStateChange (TOKEN_REFRESHED) e a
+  // tela ficava "Verificando acesso…" toda vez. Agora o refresh não reseta nada.
+  const userId = session?.user.id ?? null;
   useEffect(() => {
     let alive = true;
-    if (!session) { setOwner(null); return; }
-    setOwner(null);
-    checkOwner(session.user.id).then((ok) => { if (alive) setOwner(ok); });
+    if (!userId) { setOwner(null); return; }
+    checkOwner(userId).then((ok) => { if (alive) setOwner(ok); });
     return () => { alive = false; };
-  }, [session]);
+  }, [userId]);
 
   const toggleTheme = () => setTheme((t) => (t === 'dark' ? 'light' : 'dark'));
 

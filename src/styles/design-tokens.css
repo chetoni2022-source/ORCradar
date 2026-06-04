@@ -498,3 +498,47 @@ html.dark, html.theme-dark, .theme-dark, .dark {
   .orc-nav-label { display: none; }
   .orc-email { display: none; }
 }
+
+/* ── Busca, FAB e modos no mapa ──────────────────────────────────── */
+.map-search { position: absolute; top: 12px; left: 12px; z-index: 1001; width: min(340px, calc(100% - 90px)); }
+.map-search-box {
+  display: flex; align-items: center; gap: 8px; height: 44px; padding: 0 12px;
+  background: var(--bg-elev); border: 1px solid var(--border);
+  border-radius: 12px; box-shadow: var(--shadow-soft);
+}
+.map-search-box input { border: 0; outline: 0; background: transparent; font: inherit; color: var(--text); width: 100%; }
+.map-search-results {
+  margin-top: 6px; background: var(--bg-elev); border: 1px solid var(--border);
+  border-radius: 12px; box-shadow: var(--shadow-pop); overflow: hidden;
+  max-height: 280px; overflow-y: auto;
+}
+.map-search-result {
+  display: block; width: 100%; text-align: left; padding: 10px 12px;
+  border: 0; border-bottom: 1px solid var(--border); background: transparent;
+  cursor: pointer; font: inherit; font-size: 13px; color: var(--text); line-height: 1.35;
+}
+.map-search-result:last-child { border-bottom: 0; }
+.map-search-result:hover { background: var(--bg-hover); }
+
+.map-fab {
+  position: absolute; z-index: 1001;
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  height: 40px; padding: 0 14px; border-radius: 10px;
+  background: var(--bg-elev); border: 1px solid var(--border); box-shadow: var(--shadow-soft);
+  color: var(--text); font: inherit; font-weight: 600; font-size: 13px; cursor: pointer;
+}
+.map-fab:hover { background: var(--bg-hover); }
+.map-fab:disabled { opacity: 0.6; cursor: default; }
+
+.seg { display: inline-flex; gap: 4px; background: var(--bg-sunken); border-radius: 999px; padding: 3px; width: 100%; }
+.seg-item {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px; flex: 1;
+  height: 32px; padding: 0 8px; border-radius: 999px; border: 0;
+  background: transparent; color: var(--text-muted); font: inherit; font-weight: 600; font-size: 12.5px; cursor: pointer;
+}
+.seg-item.is-on { background: var(--bg-elev); color: var(--tech-deep); box-shadow: var(--shadow-card); }
+.theme-dark .seg-item.is-on, .dark .seg-item.is-on { color: var(--tech); }
+
+/* Controles do Leaflet — cantos arredondados */
+.leaflet-control-layers, .leaflet-bar { border-radius: 10px !important; }
+.leaflet-bar { overflow: hidden; }
