@@ -44,7 +44,8 @@ export interface CrmLead {
   observacoes: string | null;
   proximo_passo: string | null;
   data_proximo_passo: string | null;
-  ultimo_contato: string | null;
+  /** No banco a coluna é `ultimo_contato_at` (reaproveitada do ORCtech). */
+  ultimo_contato_at: string | null;
   tentativas_contato: number;
   origem: string;
   aprovado: boolean;
