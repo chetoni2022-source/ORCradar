@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <style>
+    .o { fill: #0A0A0A; }
+    @media (prefers-color-scheme: dark) { .o { fill: #FAFAFA; } }
+  </style>
+  <text x="50%" y="50%" dy="0.36em" text-anchor="middle"
+        font-family="Inter, Helvetica, Arial, sans-serif"
+        font-weight="800" font-size="42" letter-spacing="-2">
+    <tspan class="o">O</tspan><tspan fill="#00C46A">r</tspan>
+  </text>
+</svg>

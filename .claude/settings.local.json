@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell($zip = \"C:\\\\Users\\\\cheto\\\\OneDrive\\\\Área de Trabalho\\\\ORCTECH2026-main.zip\"; Test-Path -LiteralPath $zip; \\(Get-Item -LiteralPath $zip\\).Length)",
+      "mcp__178605c3-5aca-4102-af43-ba01853d6110__list_projects"
+    ]
+  }
+}

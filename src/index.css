@@ -1,0 +1,61 @@
+@import "tailwindcss";
+@import "./styles/design-tokens.css";
+
+/*
+ * ORCradar — a fonte da verdade visual é `./styles/design-tokens.css`,
+ * adaptado da identidade do ORCtech (mesma paleta verde #00C46A, mesma
+ * tipografia Plus Jakarta Sans, mesmos cards soft).
+ *
+ * O bloco abaixo espelha os tokens no @theme do Tailwind pra que as utilities
+ * (bg-primary, text-muted-foreground, etc.) resolvam pros tokens certos.
+ */
+@theme {
+  --color-background: var(--bg);
+  --color-foreground: var(--text);
+  --color-card: var(--bg-elev);
+  --color-card-foreground: var(--text);
+  --color-primary: var(--tech);
+  --color-primary-foreground: #ffffff;
+  --color-secondary: var(--bg-sunken);
+  --color-muted: var(--bg-sunken);
+  --color-muted-foreground: var(--text-muted);
+  --color-accent: var(--tech-soft);
+  --color-accent-foreground: var(--tech-deep);
+  --color-destructive: var(--error);
+  --color-warning: var(--warning);
+  --color-success: var(--success);
+  --color-border: var(--border);
+  --color-ring: var(--tech);
+
+  --radius: 8px;
+  --font-sans: var(--font-sans);
+}
+
+html, body, #root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
+  width: 100%;
+}
+
+#root {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+body {
+  font-family: var(--font-sans);
+  color: var(--text);
+  background: var(--bg);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-feature-settings: "cv11", "ss01";
+}
+
+img, video, iframe, svg, canvas { max-width: 100%; height: auto; }
+button, a, [role="button"] { -webkit-tap-highlight-color: transparent; }
