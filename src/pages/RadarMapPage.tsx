@@ -5,13 +5,14 @@ import {
 } from 'react-leaflet';
 import {
   Radar, MapPin, Save, Loader2, Trash2, RotateCcw, Crosshair, CheckCircle2,
-  AlertCircle, Search, X, LocateFixed, Navigation, Car, Bike, Footprints,
+  AlertCircle, Search, X, LocateFixed, Navigation, Car, Bike, Footprints, DownloadCloud,
 } from 'lucide-react';
 import { listRegioes, createRegiao, deleteRegiao, type NovaRegiao } from '../lib/radarRegioes';
 import {
   getMinhaLocalizacao, buscarEndereco, tracarRota, formatarDuracao,
   type LatLng, type ModoRota, type Rota, type GeocodeResult,
 } from '../lib/geo';
+import { rasparRegiao } from '../lib/scrape';
 import type { RadarRegiao } from '../types/database';
 
 const VISAO_INICIAL: [number, number] = [-23.5505, -46.6333]; // São Paulo
@@ -66,6 +67,8 @@ export function RadarMapPage() {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [mostrarSalvas, setMostrarSalvas] = useState(true);
   const [focus, setFocus] = useState<{ lat: number; lng: number; zoom: number } | null>(null);
+  const [scrapingId, setScrapingId] = useState<string | null>(null);
+  const [scrapeMsg, setScrapeMsg] = useState<{ text: string; ok: boolean } | null>(null);
 
   // Busca ---------------------------------------------------------------
   const [q, setQ] = useState('');
@@ -142,6 +145,21 @@ export function RadarMapPage() {
       await carregar();
     } catch (e) {
       setListError(e instanceof Error ? e.message : 'Falha ao excluir.');
+    }
+  }
+
+  async function handleRaspar(r: RadarRegiao) {
+    if (scrapingId) return;
+    setScrapingId(r.id);
+    setScrapeMsg(null);
+    try {
+      const res = await rasparRegiao(r.id);
+      setScrapeMsg({ ok: true, text: `${r.nome ?? 'Região'}: ${res.inseridos} leads novos (${res.duplicados} duplicados).` });
+      await carregar();
+    } catch (e) {
+      setScrapeMsg({ ok: false, text: e instanceof Error ? e.message : 'Falha na raspagem.' });
+    } finally {
+      setScrapingId(null);
     }
   }
 
@@ -301,6 +319,14 @@ export function RadarMapPage() {
           </div>
         </div>
 
+        {scrapingId ? (
+          <div className="row t-caption t-muted" style={{ gap: 8 }}><Loader2 size={14} className="spin" /> Raspando leads… pode levar alguns minutos.</div>
+        ) : scrapeMsg ? (
+          <div className="row" style={{ gap: 8, fontSize: 12.5, color: scrapeMsg.ok ? 'var(--tech-deep)' : 'var(--error)' }}>
+            {scrapeMsg.ok ? <CheckCircle2 size={14} /> : <AlertCircle size={14} />} <span>{scrapeMsg.text}</span>
+          </div>
+        ) : null}
+
         {loadingList ? (
           <div className="row t-caption t-muted" style={{ gap: 8 }}><Loader2 size={14} className="spin" /> Carregando…</div>
         ) : listError ? (
@@ -319,6 +345,9 @@ export function RadarMapPage() {
                     {r.segmento ? ` · ${r.segmento}` : ''}{` · ${r.leads_encontrados} leads`}
                   </div>
                 </div>
+                <button className="btn btn-ghost btn-sm" style={{ width: 30, padding: 0, color: VERDE_DEEP }} onClick={(e) => { e.stopPropagation(); void handleRaspar(r); }} disabled={!!scrapingId} title="Raspar leads desta região (Apify)">
+                  {scrapingId === r.id ? <Loader2 size={14} className="spin" /> : <DownloadCloud size={14} />}
+                </button>
                 <button className="btn btn-ghost btn-sm" style={{ width: 30, padding: 0, color: 'var(--error)' }} onClick={(e) => { e.stopPropagation(); void handleExcluir(r); }} title="Excluir região"><Trash2 size={14} /></button>
               </div>
             ))}
