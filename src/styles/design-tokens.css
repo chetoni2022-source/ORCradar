@@ -404,3 +404,97 @@ html.dark, html.theme-dark, .theme-dark, .dark {
 .clickable { cursor: pointer; }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
 .mono-code { font-family: var(--font-mono); font-size: 12.5px; }
+
+/* ── App shell / topbar com navegação (Fase 1) ───────────────────── */
+.orc-topbar {
+  position: sticky; top: 0; z-index: 1100;
+  display: flex; align-items: center; gap: 16px;
+  height: 60px; padding: 0 20px;
+  background: var(--topbar-bg);
+  backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border);
+}
+.orc-nav { display: flex; align-items: center; gap: 4px; }
+.orc-nav-tab {
+  display: inline-flex; align-items: center; gap: 7px;
+  height: 36px; padding: 0 14px; border-radius: 10px;
+  color: var(--text-muted); font-weight: 600; font-size: 13.5px;
+  background: transparent; border: 0; cursor: pointer; font-family: inherit;
+  letter-spacing: -0.005em;
+  transition: background 120ms ease, color 120ms ease;
+}
+.orc-nav-tab:hover { background: var(--bg-hover); color: var(--text); }
+.orc-nav-tab.is-active { background: var(--tech-soft); color: var(--tech-deep); }
+.theme-dark .orc-nav-tab.is-active, .dark .orc-nav-tab.is-active { color: var(--tech); }
+.orc-email {
+  display: inline-flex; align-items: center; gap: 6px;
+  max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: 13px; font-weight: 500; color: var(--text-muted);
+}
+
+/* ── Mapa (Fase 1) ───────────────────────────────────────────────── */
+.map-shell {
+  display: grid;
+  grid-template-columns: 380px 1fr;
+  height: calc(100dvh - 61px);
+  min-height: 0;
+}
+.map-panel {
+  border-right: 1px solid var(--border);
+  overflow-y: auto; background: var(--bg); padding: 20px; min-width: 0;
+}
+.map-canvas { position: relative; min-width: 0; }
+.map-canvas .leaflet-container {
+  height: 100%; width: 100%;
+  background: var(--bg-sunken); font-family: var(--font-sans);
+}
+@media (max-width: 860px) {
+  .map-shell { grid-template-columns: 1fr; height: auto; }
+  .map-canvas { height: 46dvh; order: -1; }
+  .map-panel { border-right: 0; border-top: 1px solid var(--border); }
+}
+.region-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 12px; border-radius: 12px; border: 1px solid var(--border);
+  background: var(--bg-elev); cursor: pointer; width: 100%; text-align: left;
+  font-family: inherit; transition: border-color 120ms ease, background 120ms ease;
+}
+.region-item:hover { border-color: var(--border-strong); background: var(--bg-hover); }
+.region-item.is-active { border-color: var(--tech); background: var(--tech-soft); }
+.range { width: 100%; accent-color: var(--tech); height: 4px; cursor: pointer; }
+
+/* ── Login (Fase 1) ──────────────────────────────────────────────── */
+.login-wrap {
+  position: relative; z-index: 1; min-height: 100dvh;
+  display: flex; align-items: center; justify-content: center; padding: 24px;
+}
+.login-card { width: 100%; max-width: 400px; }
+
+/* ── Inputs ──────────────────────────────────────────────────────── */
+.input, .select, .textarea {
+  width: 100%; height: var(--h-input); padding: 0 14px;
+  font: inherit; color: var(--text);
+  background: var(--bg-elev); border: 1px solid var(--border);
+  border-radius: var(--r-input); outline: none;
+  transition: border-color 140ms ease, box-shadow 140ms ease;
+}
+.textarea { height: auto; padding: 12px 14px; resize: vertical; min-height: 84px; line-height: 1.5; }
+.input::placeholder, .textarea::placeholder { color: var(--text-faint); }
+.input:hover, .select:hover, .textarea:hover { border-color: var(--border-strong); }
+.input:focus, .select:focus, .textarea:focus { border-color: var(--tech); box-shadow: var(--ring); }
+.field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.field-label { font-size: 13px; font-weight: 600; color: var(--text); letter-spacing: -0.003em; }
+.field-hint { font-size: 12px; color: var(--text-faint); }
+.input-icon-wrap { position: relative; display: flex; align-items: center; width: 100%; }
+.input-icon-wrap .input { padding-left: 38px; }
+.input-icon-wrap .input-icon {
+  position: absolute; left: 12px; top: 50%; transform: translateY(-50%);
+  color: var(--text-faint); pointer-events: none; display: flex;
+}
+@media (max-width: 767px) { .input, .select, .textarea { font-size: 16px; } }
+
+/* Esconde rótulos da nav e o e-mail em telas estreitas */
+@media (max-width: 640px) {
+  .orc-nav-label { display: none; }
+  .orc-email { display: none; }
+}
