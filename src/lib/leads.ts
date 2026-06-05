@@ -1,10 +1,12 @@
 import { supabase } from './supabase';
 import type { ScoreCor } from '../types/database';
 
-/** Lead simplificado pra exibir no mapa. */
+/** Lead simplificado pra exibir no mapa e nas listas. */
 export type LeadMapa = {
   id: string;
   nome_empresa: string;
+  segmento: string | null;
+  regiao: string | null;
   telefone: string | null;
   whatsapp: string | null;
   endereco: string | null;
@@ -22,9 +24,9 @@ export type LeadMapa = {
 };
 
 const COLS =
-  'id,nome_empresa,telefone,whatsapp,endereco,cidade,link_maps,tem_site,num_avaliacoes,nota_media,score,score_cor,latitude,longitude,aprovado,duplicado';
+  'id,nome_empresa,segmento,regiao,telefone,whatsapp,endereco,cidade,link_maps,tem_site,num_avaliacoes,nota_media,score,score_cor,latitude,longitude,aprovado,duplicado';
 
-/** Lê os leads do ORCradar de uma região (só os que têm coordenadas). */
+/** Leads de uma região específica (só os que têm coordenadas — pro mapa). */
 export async function listLeadsByRegiao(nome: string | null): Promise<LeadMapa[]> {
   if (!supabase || !nome) return [];
   const { data, error } = await supabase
@@ -34,7 +36,20 @@ export async function listLeadsByRegiao(nome: string | null): Promise<LeadMapa[]
     .eq('origem', 'orcradar')
     .not('latitude', 'is', null)
     .order('num_avaliacoes', { ascending: false })
-    .limit(500);
+    .limit(800);
+  if (error) throw new Error(error.message);
+  return (data ?? []) as LeadMapa[];
+}
+
+/** Todos os leads do ORCradar (pra tela Leads / triagem). */
+export async function listAllLeads(): Promise<LeadMapa[]> {
+  if (!supabase) return [];
+  const { data, error } = await supabase
+    .from('crm_leads')
+    .select(COLS)
+    .eq('origem', 'orcradar')
+    .order('num_avaliacoes', { ascending: false })
+    .limit(2000);
   if (error) throw new Error(error.message);
   return (data ?? []) as LeadMapa[];
 }

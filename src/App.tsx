@@ -1,15 +1,21 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { ShieldAlert, LogOut, Loader2 } from 'lucide-react';
-import { TopBar, type View } from './components/TopBar';
-import { HomePage } from './pages/HomePage';
-import { RadarMapPage } from './pages/RadarMapPage';
+import { Sidebar, BottomTabBar } from './components/Shell';
+import { MapWorkspace } from './components/MapWorkspace';
+import { RegioesPage } from './pages/RegioesPage';
+import { LeadsPage } from './pages/LeadsPage';
+import { ConfigPage } from './pages/ConfigPage';
 import { LoginPage } from './pages/LoginPage';
 import { RadarMark } from './components/RadarMark';
 import { isSupabaseConfigured } from './lib/supabase';
 import { getSession, onAuthChange, checkOwner, signOut } from './lib/auth';
+import { listRegioes } from './lib/radarRegioes';
+import type { RadarRegiao } from './types/database';
+import type { LeadMapa } from './lib/leads';
 
 export type Theme = 'light' | 'dark';
+export type View = 'mapa' | 'regioes' | 'leads' | 'config';
 
 function Splash({ label }: { label: string }) {
   return (
@@ -17,9 +23,7 @@ function Splash({ label }: { label: string }) {
       <div className="brand-blobs" aria-hidden />
       <div className="col" style={{ alignItems: 'center', gap: 16, position: 'relative', zIndex: 1 }}>
         <RadarMark size={72} />
-        <div className="row t-muted" style={{ gap: 8 }}>
-          <Loader2 size={16} className="spin" /> {label}
-        </div>
+        <div className="row t-muted" style={{ gap: 8 }}><Loader2 size={16} className="spin" /> {label}</div>
       </div>
     </div>
   );
@@ -29,9 +33,7 @@ function CentralCard({ children }: { children: ReactNode }) {
   return (
     <div className="login-wrap">
       <div className="brand-blobs" aria-hidden />
-      <div className="login-card card card-lg col" style={{ gap: 16, alignItems: 'center', textAlign: 'center', position: 'relative', zIndex: 1 }}>
-        {children}
-      </div>
+      <div className="login-card card card-lg col" style={{ gap: 16, alignItems: 'center', textAlign: 'center', position: 'relative', zIndex: 1 }}>{children}</div>
     </div>
   );
 }
@@ -43,33 +45,25 @@ export default function App() {
     if (saved === 'light' || saved === 'dark') return saved;
     return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
   });
-
   useEffect(() => {
     const root = document.documentElement;
     root.classList.toggle('dark', theme === 'dark');
     root.classList.toggle('theme-dark', theme === 'dark');
     localStorage.setItem('orcradar-theme', theme);
   }, [theme]);
+  const toggleTheme = () => setTheme((t) => (t === 'dark' ? 'light' : 'dark'));
 
   const [session, setSession] = useState<Session | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [owner, setOwner] = useState<boolean | null>(null);
-  const [view, setView] = useState<View>('overview');
 
   useEffect(() => {
     let alive = true;
-    getSession().then((s) => {
-      if (!alive) return;
-      setSession(s);
-      setAuthLoading(false);
-    });
+    getSession().then((s) => { if (!alive) return; setSession(s); setAuthLoading(false); });
     const unsub = onAuthChange((s) => { if (alive) setSession(s); });
     return () => { alive = false; unsub(); };
   }, []);
 
-  // Verifica owner apenas quando o USUÁRIO muda (não a cada refresh de token).
-  // Sem isso, voltar pra aba disparava onAuthStateChange (TOKEN_REFRESHED) e a
-  // tela ficava "Verificando acesso…" toda vez. Agora o refresh não reseta nada.
   const userId = session?.user.id ?? null;
   useEffect(() => {
     let alive = true;
@@ -78,7 +72,27 @@ export default function App() {
     return () => { alive = false; };
   }, [userId]);
 
-  const toggleTheme = () => setTheme((t) => (t === 'dark' ? 'light' : 'dark'));
+  // Estado compartilhado da app -----------------------------------------------
+  const [view, setView] = useState<View>('mapa');
+  const [regions, setRegions] = useState<RadarRegiao[]>([]);
+  const [regionsLoading, setRegionsLoading] = useState(true);
+  const [regionsError, setRegionsError] = useState<string | null>(null);
+  const [activeRegionId, setActiveRegionId] = useState<string | null>(null);
+  const [focusLatLng, setFocusLatLng] = useState<{ lat: number; lng: number } | null>(null);
+
+  const reloadRegions = useCallback(async () => {
+    setRegionsLoading(true); setRegionsError(null);
+    try { setRegions(await listRegioes()); }
+    catch (e) { setRegionsError(e instanceof Error ? e.message : 'Falha ao carregar regiões.'); }
+    finally { setRegionsLoading(false); }
+  }, []);
+  useEffect(() => { if (owner) void reloadRegions(); }, [owner, reloadRegions]);
+
+  function openLead(lead: LeadMapa) {
+    if (lead.regiao) { const r = regions.find((x) => x.nome === lead.regiao); if (r) setActiveRegionId(r.id); }
+    if (lead.latitude != null && lead.longitude != null) setFocusLatLng({ lat: lead.latitude, lng: lead.longitude });
+    setView('mapa');
+  }
 
   let content: ReactNode;
 
@@ -87,11 +101,7 @@ export default function App() {
       <CentralCard>
         <ShieldAlert size={32} style={{ color: 'var(--warning)' }} />
         <div className="t-h2">Configuração ausente</div>
-        <div className="t-body t-muted">
-          Preencha <span className="mono-code">VITE_SUPABASE_URL</span> e{' '}
-          <span className="mono-code">VITE_SUPABASE_ANON_KEY</span> no arquivo{' '}
-          <span className="mono-code">.env</span> e reinicie o servidor.
-        </div>
+        <div className="t-body t-muted">Preencha <span className="mono-code">VITE_SUPABASE_URL</span> e <span className="mono-code">VITE_SUPABASE_ANON_KEY</span> no <span className="mono-code">.env</span> e reinicie.</div>
       </CentralCard>
     );
   } else if (authLoading) {
@@ -105,36 +115,42 @@ export default function App() {
       <CentralCard>
         <ShieldAlert size={32} style={{ color: 'var(--error)' }} />
         <div className="t-h2">Acesso restrito</div>
-        <div className="t-body t-muted">
-          A conta <span className="mono-code">{session.user.email}</span> não é dona da plataforma.
-          O ORCradar é exclusivo do superadmin.
-        </div>
-        <button className="btn btn-secondary" onClick={() => void signOut()}>
-          <LogOut size={16} /> Sair
-        </button>
+        <div className="t-body t-muted">A conta <span className="mono-code">{session?.user.email}</span> não é dona da plataforma.</div>
+        <button className="btn btn-secondary" onClick={() => void signOut()}><LogOut size={16} /> Sair</button>
       </CentralCard>
     );
   } else {
+    const email = session?.user.email ?? 'preview@local';
     content = (
-      <>
-        <TopBar
-          view={view}
-          onNavigate={setView}
-          theme={theme}
-          onToggleTheme={toggleTheme}
-          email={session.user.email ?? null}
-          onSignOut={() => void signOut()}
-        />
-        <div className="grow" style={{ minHeight: 0 }}>
-          {view === 'overview' ? <HomePage onOpenMapa={() => setView('mapa')} /> : <RadarMapPage />}
-        </div>
-      </>
+      <div className="app-grid">
+        <Sidebar view={view} onNavigate={setView} email={email} theme={theme} onToggleTheme={toggleTheme} onSignOut={() => void signOut()} counts={{ regioes: regions.length }} />
+        <main className="app-main">
+          {view === 'mapa' && (
+            <MapWorkspace
+              regions={regions}
+              reloadRegions={() => void reloadRegions()}
+              activeRegionId={activeRegionId}
+              setActiveRegionId={setActiveRegionId}
+              focusLatLng={focusLatLng}
+              clearFocus={() => setFocusLatLng(null)}
+              onGoLeads={() => setView('leads')}
+            />
+          )}
+          {view === 'regioes' && (
+            <RegioesPage
+              regions={regions} loading={regionsLoading} error={regionsError} reload={() => void reloadRegions()}
+              onOpen={(id) => { setActiveRegionId(id); setView('mapa'); }}
+              onScrape={(id) => { setActiveRegionId(id); setView('mapa'); }}
+              onNew={() => { setActiveRegionId(null); setView('mapa'); }}
+            />
+          )}
+          {view === 'leads' && <LeadsPage onOpenLead={openLead} />}
+          {view === 'config' && <ConfigPage theme={theme} onToggleTheme={toggleTheme} email={email} />}
+        </main>
+        <BottomTabBar view={view} onNavigate={setView} />
+      </div>
     );
   }
 
-  return (
-    <div className="app-root" style={{ display: 'flex', flexDirection: 'column', minHeight: '100dvh' }}>
-      {content}
-    </div>
-  );
+  return <div className="app-root">{content}</div>;
 }
