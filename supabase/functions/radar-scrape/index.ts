@@ -1,12 +1,13 @@
 // ORCradar — Edge Function `radar-scrape`
 // Raspa leads de uma região (via Apify / Google Maps Scraper) e grava em crm_leads.
 //
-// SEGURANÇA: o token do Apify NUNCA vai pro navegador. Ele fica como secret
-// desta função (APIFY_TOKEN). A função valida que quem chama é o dono da
-// plataforma (is_platform_owner) antes de qualquer coisa.
+// SEGURANÇA: a função valida que quem chama é o dono (is_platform_owner) antes
+// de tudo. O token do Apify vem do secret APIFY_TOKEN (preferível) OU é enviado
+// pelo app no corpo da requisição (fica só na máquina do dono). NUNCA é gravado
+// no banco nem embutido no bundle.
 //
-// Secrets/var. de ambiente usadas:
-//   - APIFY_TOKEN                 (você configura — token da sua conta Apify)
+// Variáveis de ambiente:
+//   - APIFY_TOKEN                 (opcional — secret da função, se configurado)
 //   - SUPABASE_URL                (injetada automaticamente pelo Supabase)
 //   - SUPABASE_ANON_KEY           (injetada automaticamente)
 //   - SUPABASE_SERVICE_ROLE_KEY   (injetada automaticamente)
@@ -44,11 +45,6 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
 
   try {
-    const APIFY_TOKEN = Deno.env.get('APIFY_TOKEN');
-    if (!APIFY_TOKEN) {
-      return json({ error: 'APIFY_TOKEN não configurado nas secrets da função.' }, 500);
-    }
-
     const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
     const ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!;
     const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -67,6 +63,13 @@ Deno.serve(async (req) => {
     const regiaoId = body?.regiao_id as string | undefined;
     const max = Math.min(Number(body?.max) || 50, 120);
     if (!regiaoId) return json({ error: 'regiao_id é obrigatório.' }, 400);
+
+    // Token do Apify: secret da função (preferível) OU enviado pelo app.
+    const APIFY_TOKEN = Deno.env.get('APIFY_TOKEN') ||
+      (typeof body?.apify_token === 'string' ? body.apify_token.trim() : '');
+    if (!APIFY_TOKEN) {
+      return json({ error: 'Token do Apify ausente. Configure no app (campo "Token Apify") ou como secret APIFY_TOKEN.' }, 400);
+    }
 
     // 2) Cliente admin (service role) pras operações de dados.
     const admin = createClient(SUPABASE_URL, SERVICE_KEY);

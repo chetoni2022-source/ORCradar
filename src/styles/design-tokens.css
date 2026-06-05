@@ -574,3 +574,58 @@ html.dark .logo-img .logo-img-dark, html.theme-dark .logo-img .logo-img-dark { d
   .orc-topbar { gap: 8px; padding: 0 12px; }
   .orc-topbar .badge { display: none; }
 }
+
+/* ── Cards de região (lista) ─────────────────────────────────────── */
+.region-card {
+  border: 1px solid var(--border); border-radius: 14px; background: var(--bg-elev);
+  padding: 12px; display: flex; flex-direction: column; gap: 10px;
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+.region-card.is-active { border-color: var(--tech); box-shadow: var(--ring); }
+.region-card-head { display: flex; align-items: center; gap: 10px; cursor: pointer; min-width: 0; }
+.region-card-actions { display: flex; gap: 8px; align-items: center; }
+.region-card-actions .btn { flex: 1; }
+
+/* ── Bloco de passo (numerado) ───────────────────────────────────── */
+.step-block { display: flex; flex-direction: column; gap: 12px; }
+.step-head { display: flex; align-items: center; gap: 10px; }
+.step-badge {
+  width: 26px; height: 26px; border-radius: 8px; flex-shrink: 0;
+  background: var(--tech); color: #fff; display: inline-flex; align-items: center;
+  justify-content: center; font-weight: 800; font-size: 13px; font-variant-numeric: tabular-nums;
+}
+
+/* ── details/summary (seções recolhíveis) ────────────────────────── */
+.collapse > summary {
+  list-style: none; cursor: pointer; display: flex; align-items: center; gap: 10px;
+  padding: 4px 0; user-select: none;
+}
+.collapse > summary::-webkit-details-marker { display: none; }
+.collapse > summary .chev { margin-left: auto; transition: transform 180ms ease; color: var(--text-faint); }
+.collapse[open] > summary .chev { transform: rotate(180deg); }
+
+/* ── Modal de raspagem ───────────────────────────────────────────── */
+.scrape-modal {
+  width: min(440px, calc(100vw - 32px)); padding: 28px 24px; text-align: center;
+  display: flex; flex-direction: column; align-items: center; gap: 14px;
+  position: relative; z-index: 80;
+}
+.scrape-modal .big-num {
+  font-size: 42px; font-weight: 800; letter-spacing: -0.03em; color: var(--text);
+  line-height: 1; font-variant-numeric: tabular-nums;
+}
+.scrape-wrap { position: fixed; inset: 0; z-index: 80; display: flex; align-items: center; justify-content: center; padding: 16px; }
+.backdrop { position: fixed; inset: 0; z-index: 0; background: rgba(10, 10, 11, 0.55); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); }
+.modal-card { background: var(--bg-elev); border-radius: var(--r-card-lg); box-shadow: var(--shadow-pop); border: 1px solid var(--border); }
+
+/* ── Popup do Leaflet (lead) — cores fixas (popup é claro) ───────── */
+.leaflet-popup-content-wrapper { border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.18); }
+.leaflet-popup-content { margin: 12px 14px; font-family: var(--font-sans); min-width: 180px; }
+.lead-pop-title { font-weight: 700; font-size: 14px; color: #18181B; margin-bottom: 4px; line-height: 1.25; }
+.lead-pop-row { font-size: 12.5px; color: #52525B; display: flex; align-items: center; gap: 6px; margin-top: 3px; }
+.lead-pop-link { color: #00A058; font-weight: 600; text-decoration: none; }
+.lead-pop-link:hover { text-decoration: underline; }
+
+/* Token Apify — destaque quando necessário */
+.token-box { display: flex; flex-direction: column; gap: 8px; padding: 12px; }
+.token-box.is-warn { background: var(--warning-soft); border: 1px solid transparent; border-radius: var(--r-card); }
