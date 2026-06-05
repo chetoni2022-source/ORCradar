@@ -833,3 +833,9 @@ html.dark, html.theme-dark {
 .theme-dark .lead-card-open, .dark .lead-card-open { color: var(--tech); }
 .lead-card-maps { font-size: 12px; font-weight: 600; color: var(--text-muted); text-decoration: none; display: inline-flex; align-items: center; gap: 5px; }
 .lead-card-maps:hover { color: var(--text); }
+
+/* ── Modal de detalhe do lead (Fase 3) ───────────────────────────── */
+.lead-modal { width: min(480px, calc(100vw - 32px)); max-height: calc(100dvh - 48px); overflow-y: auto; padding: 22px; display: flex; flex-direction: column; gap: 14px; position: relative; z-index: 81; }
+.lead-modal-head { display: flex; align-items: flex-start; gap: 12px; }
+.lead-modal-info { display: flex; flex-direction: column; gap: 8px; font-size: 13px; }
+.lead-modal .score-pop { right: auto; left: 0; }

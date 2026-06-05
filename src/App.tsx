@@ -7,6 +7,7 @@ import { RegioesPage } from './pages/RegioesPage';
 import { LeadsPage } from './pages/LeadsPage';
 import { ConfigPage } from './pages/ConfigPage';
 import { LoginPage } from './pages/LoginPage';
+import { LeadDetailModal } from './components/LeadDetailModal';
 import { RadarMark } from './components/RadarMark';
 import { isSupabaseConfigured } from './lib/supabase';
 import { getSession, onAuthChange, checkOwner, signOut } from './lib/auth';
@@ -79,6 +80,8 @@ export default function App() {
   const [regionsError, setRegionsError] = useState<string | null>(null);
   const [activeRegionId, setActiveRegionId] = useState<string | null>(null);
   const [focusLatLng, setFocusLatLng] = useState<{ lat: number; lng: number } | null>(null);
+  const [detailLead, setDetailLead] = useState<LeadMapa | null>(null);
+  const [leadsVersion, setLeadsVersion] = useState(0);
 
   const reloadRegions = useCallback(async () => {
     setRegionsLoading(true); setRegionsError(null);
@@ -134,6 +137,7 @@ export default function App() {
               focusLatLng={focusLatLng}
               clearFocus={() => setFocusLatLng(null)}
               onGoLeads={() => setView('leads')}
+              onReview={setDetailLead}
             />
           )}
           {view === 'regioes' && (
@@ -144,12 +148,20 @@ export default function App() {
               onNew={() => { setActiveRegionId(null); setView('mapa'); }}
             />
           )}
-          {view === 'leads' && <LeadsPage onOpenLead={openLead} />}
+          {view === 'leads' && <LeadsPage onReview={setDetailLead} leadsVersion={leadsVersion} />}
           {view === 'config' && <ConfigPage theme={theme} onToggleTheme={toggleTheme} email={email} />}
         </main>
         <BottomTabBar view={view} onNavigate={setView} />
       </div>
     );
+    if (detailLead) {
+      content = (
+        <>
+          {content}
+          <LeadDetailModal lead={detailLead} onClose={() => setDetailLead(null)} onChanged={() => setLeadsVersion((v) => v + 1)} onOpenMapa={openLead} />
+        </>
+      );
+    }
   }
 
   return <div className="app-root">{content}</div>;

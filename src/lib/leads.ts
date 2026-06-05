@@ -22,10 +22,13 @@ export type LeadMapa = {
   longitude: number | null;
   aprovado: boolean;
   duplicado: boolean;
+  etapa: string;
+  mensagem_whatsapp: string | null;
+  tom_mensagem: string | null;
 };
 
 const COLS =
-  'id,nome_empresa,segmento,regiao,telefone,whatsapp,endereco,cidade,link_maps,tem_site,tem_fotos,num_avaliacoes,nota_media,score,score_cor,latitude,longitude,aprovado,duplicado';
+  'id,nome_empresa,segmento,regiao,telefone,whatsapp,endereco,cidade,link_maps,tem_site,tem_fotos,num_avaliacoes,nota_media,score,score_cor,latitude,longitude,aprovado,duplicado,etapa,mensagem_whatsapp,tom_mensagem';
 
 /** Leads de uma região específica (só os que têm coordenadas — pro mapa). */
 export async function listLeadsByRegiao(nome: string | null): Promise<LeadMapa[]> {

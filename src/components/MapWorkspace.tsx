@@ -34,6 +34,7 @@ type Props = {
   focusLatLng: { lat: number; lng: number } | null;
   clearFocus: () => void;
   onGoLeads: () => void;
+  onReview: (lead: LeadMapa) => void;
 };
 
 function zoomForRaio(km: number) { return Math.max(8, Math.min(15, Math.round(13 - Math.log2(Math.max(km, 0.5))))); }
@@ -50,7 +51,7 @@ function Stepper({ active }: { active: 1 | 2 | 3 }) {
   );
 }
 
-export function MapWorkspace({ regions, reloadRegions, activeRegionId, setActiveRegionId, focusLatLng, clearFocus, onGoLeads }: Props) {
+export function MapWorkspace({ regions, reloadRegions, activeRegionId, setActiveRegionId, focusLatLng, clearFocus, onGoLeads, onReview }: Props) {
   const mapRef = useRef<MapRef>(null);
   const [basemap, setBasemap] = useState<Basemap>('streets');
   const [mapCenter, setMapCenter] = useState<[number, number]>([-46.6333, -23.5505]);
@@ -259,8 +260,8 @@ export function MapWorkspace({ regions, reloadRegions, activeRegionId, setActive
               {selectedLead.telefone && <div className="lp-row"><MapPin size={12} /> {selectedLead.telefone}</div>}
               {selectedLead.endereco && <div className="lp-row" style={{ alignItems: 'flex-start' }}>{selectedLead.endereco}</div>}
               <div className="lp-actions">
-                {selectedLead.link_maps && <a className="lp-btn" href={selectedLead.link_maps} target="_blank" rel="noreferrer"><Globe size={13} /> Ver no Maps</a>}
-                {selectedLead.tem_site && <span className="lp-btn" style={{ cursor: 'default' }}>tem site</span>}
+                <button className="lp-btn primary" onClick={() => { const l = selectedLead; setSelectedLead(null); onReview(l); }}>Revisar</button>
+                {selectedLead.link_maps && <a className="lp-btn" href={selectedLead.link_maps} target="_blank" rel="noreferrer"><Globe size={13} /> Maps</a>}
               </div>
             </div>
           </Popup>
