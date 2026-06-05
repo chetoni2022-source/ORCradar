@@ -82,7 +82,7 @@ Deno.serve(async (req) => {
       searchStringsArray: [segmento],
       customGeolocation: circlePolygon(Number(regiao.centro_lat), Number(regiao.centro_lng), Number(regiao.raio_km)),
       maxCrawledPlacesPerSearch: max,
-      language: 'pt-br',
+      language: 'pt-BR',
       skipClosedPlaces: true,
     };
     const runUrl = `https://api.apify.com/v2/acts/compass~crawler-google-places/run-sync-get-dataset-items?token=${APIFY_TOKEN}`;
@@ -123,7 +123,7 @@ Deno.serve(async (req) => {
         tem_site: !!p.website,
         num_avaliacoes: Number(p.reviewsCount ?? 0),
         nota_media: p.totalScore != null ? Number(p.totalScore) : null,
-        tem_fotos: !!(p.imageUrl || (Array.isArray(p.images) && p.images.length)),
+        tem_fotos: !!(p.imageUrl || Number(p.imagesCount) > 0),
         latitude: p.location?.lat ?? null,
         longitude: p.location?.lng ?? null,
         regiao: regiao.nome ?? null,
