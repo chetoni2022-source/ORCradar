@@ -542,3 +542,35 @@ html.dark, html.theme-dark, .theme-dark, .dark {
 /* Controles do Leaflet — cantos arredondados */
 .leaflet-control-layers, .leaflet-bar { border-radius: 10px !important; }
 .leaflet-bar { overflow: hidden; }
+
+/* ── Logo em imagem (troca por tema) ─────────────────────────────── */
+.logo-img { display: inline-flex; align-items: center; user-select: none; flex-shrink: 0; }
+.logo-img img { height: 100%; width: auto; display: block; }
+.logo-img .logo-img-dark { display: none; }
+html.dark .logo-img .logo-img-light, html.theme-dark .logo-img .logo-img-light { display: none; }
+html.dark .logo-img .logo-img-dark, html.theme-dark .logo-img .logo-img-dark { display: block; }
+
+/* ── Grids responsivas ───────────────────────────────────────────── */
+.grid-auto-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+.grid-auto-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
+@media (max-width: 720px) {
+  .grid-auto-2 { grid-template-columns: 1fr; }
+  .grid-auto-3 { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 440px) {
+  .grid-auto-3 { grid-template-columns: 1fr; }
+}
+
+/* ── Mira do centro no mapa ──────────────────────────────────────── */
+.map-crosshair {
+  position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+  z-index: 600; pointer-events: none; color: var(--tech-deep);
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.35));
+}
+.theme-dark .map-crosshair, .dark .map-crosshair { color: var(--tech); }
+
+/* ── Ajustes mobile do topbar ────────────────────────────────────── */
+@media (max-width: 480px) {
+  .orc-topbar { gap: 8px; padding: 0 12px; }
+  .orc-topbar .badge { display: none; }
+}

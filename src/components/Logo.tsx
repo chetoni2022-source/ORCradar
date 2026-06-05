@@ -1,28 +1,22 @@
 import type { CSSProperties } from 'react';
 
 type LogoProps = {
+  /** Altura do logo em px (a largura ajusta sozinha). */
   size?: number;
-  onDark?: boolean;
   style?: CSSProperties;
   className?: string;
-  /** Esconde o ponto verde de assinatura. */
-  noDot?: boolean;
 };
 
 /**
- * Wordmark do ORCradar — mesma família visual do ORCtech: "ORC" na cor do
- * texto, "radar" em verde, e o ponto verde de assinatura no fim.
+ * Wordmark oficial do ORCradar (o "O" é o radar). Troca automaticamente entre
+ * a versão pra fundo claro e a pra fundo escuro conforme o tema (classe `dark`
+ * no <html>).
  */
-export function Logo({ size = 20, onDark = false, style, className = '', noDot = false }: LogoProps) {
+export function Logo({ size = 22, style, className = '' }: LogoProps) {
   return (
-    <span
-      className={`logo ${onDark ? 'logo-on-dark' : ''} ${className}`.trim()}
-      style={{ fontSize: size, ...style }}
-      aria-label="ORCradar"
-    >
-      <span className="orc">ORC</span>
-      <span className="radar">radar</span>
-      {!noDot && <span className="logo-dot" aria-hidden />}
+    <span className={`logo-img ${className}`.trim()} style={{ height: size, ...style }} aria-label="ORCradar">
+      <img className="logo-img-light" src="/brand/orcradar-onlight.png" alt="ORCradar" />
+      <img className="logo-img-dark" src="/brand/orcradar-ondark.png" alt="ORCradar" />
     </span>
   );
 }

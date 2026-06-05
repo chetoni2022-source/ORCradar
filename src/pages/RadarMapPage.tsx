@@ -50,9 +50,20 @@ function FlyTo({ target }: { target: { lat: number; lng: number; zoom: number } 
   return null;
 }
 
+function TrackCenter({ onMove }: { onMove: (c: LatLng) => void }) {
+  const map = useMapEvents({
+    moveend() {
+      const c = map.getCenter();
+      onMove({ lat: c.lat, lng: c.lng });
+    },
+  });
+  return null;
+}
+
 export function RadarMapPage() {
   // Região --------------------------------------------------------------
   const [center, setCenter] = useState<LatLng | null>(null);
+  const [mapCenter, setMapCenter] = useState<LatLng>({ lat: VISAO_INICIAL[0], lng: VISAO_INICIAL[1] });
   const [raioKm, setRaioKm] = useState(5);
   const [nome, setNome] = useState('');
   const [segmento, setSegmento] = useState('');
@@ -84,6 +95,9 @@ export function RadarMapPage() {
   const [routing, setRouting] = useState(false);
   const [routeError, setRouteError] = useState<string | null>(null);
 
+  // Centro efetivo da região: ponto fixado por clique OU o meio do mapa.
+  const effectiveCenter = center ?? mapCenter;
+
   const limparRota = () => { setRota(null); setRouteError(null); };
 
   const carregar = useCallback(async () => {
@@ -103,13 +117,13 @@ export function RadarMapPage() {
   }
 
   async function handleSalvar() {
-    if (!center || saving) return;
+    if (saving) return;
     setSaving(true);
     setSaveError(null);
     const nova: NovaRegiao = {
       nome: nome.trim() || null,
-      centro_lat: Number(center.lat.toFixed(6)),
-      centro_lng: Number(center.lng.toFixed(6)),
+      centro_lat: Number(effectiveCenter.lat.toFixed(6)),
+      centro_lng: Number(effectiveCenter.lng.toFixed(6)),
       raio_km: raioKm,
       segmento: segmento.trim() || null,
     };
@@ -195,17 +209,17 @@ export function RadarMapPage() {
   }
 
   async function tracar(m: ModoRota) {
-    if (!minhaLoc || !center) { setRouteError('Defina sua localização e um centro no mapa.'); return; }
+    if (!minhaLoc) { setRouteError('Use sua localização primeiro (botão "Onde estou").'); return; }
     setRouting(true);
     setRouteError(null);
-    try { setRota(await tracarRota(minhaLoc, center, m)); }
+    try { setRota(await tracarRota(minhaLoc, effectiveCenter, m)); }
     catch (e) { setRouteError(e instanceof Error ? e.message : 'Falha na rota.'); setRota(null); }
     finally { setRouting(false); }
   }
 
   function escolherModo(m: ModoRota) {
     setModo(m);
-    if (minhaLoc && center) void tracar(m);
+    if (minhaLoc) void tracar(m);
   }
 
   return (
@@ -237,24 +251,22 @@ export function RadarMapPage() {
           <div className="between t-caption t-faint"><span>1 km</span><span>50 km</span></div>
         </div>
 
-        {center ? (
-          <div className="card-soft row" style={{ gap: 10, padding: 12 }}>
-            <MapPin size={16} style={{ color: VERDE_DEEP, flexShrink: 0 }} />
-            <div className="grow mono-code" style={{ fontSize: 12 }}>{center.lat.toFixed(5)}, {center.lng.toFixed(5)}</div>
-            <button className="btn btn-ghost btn-sm" style={{ width: 30, padding: 0 }} onClick={() => { setCenter(null); setActiveId(null); limparRota(); }} title="Limpar centro">
+        <div className="card-soft row" style={{ gap: 10, padding: 12 }}>
+          <MapPin size={16} style={{ color: VERDE_DEEP, flexShrink: 0 }} />
+          <div className="grow" style={{ minWidth: 0 }}>
+            <div className="mono-code" style={{ fontSize: 12 }}>{effectiveCenter.lat.toFixed(5)}, {effectiveCenter.lng.toFixed(5)}</div>
+            <div className="t-caption t-faint" style={{ marginTop: 2 }}>{center ? 'ponto fixado no mapa' : 'centro = meio do mapa (arraste pra posicionar)'}</div>
+          </div>
+          {center && (
+            <button className="btn btn-ghost btn-sm" style={{ width: 30, padding: 0 }} onClick={() => { setCenter(null); setActiveId(null); limparRota(); }} title="Soltar — voltar pro meio do mapa">
               <RotateCcw size={14} />
             </button>
-          </div>
-        ) : (
-          <div className="card-soft row" style={{ gap: 10, padding: 12, color: 'var(--text-muted)' }}>
-            <Crosshair size={16} style={{ flexShrink: 0 }} />
-            <div className="t-caption">Clique no mapa para marcar o centro.</div>
-          </div>
-        )}
+          )}
+        </div>
 
         {saveError && <div className="row" style={{ gap: 8, color: 'var(--error)', fontSize: 13 }}><AlertCircle size={15} /> <span>{saveError}</span></div>}
 
-        <button className="btn btn-primary btn-block" onClick={handleSalvar} disabled={!center || saving}>
+        <button className="btn btn-primary btn-block" onClick={handleSalvar} disabled={saving}>
           {saving ? <Loader2 size={17} className="spin" /> : savedFlash ? <CheckCircle2 size={17} /> : <Save size={17} />}
           {saving ? 'Salvando…' : savedFlash ? 'Região salva!' : 'Salvar região'}
         </button>
@@ -284,7 +296,7 @@ export function RadarMapPage() {
           ))}
         </div>
 
-        <button className="btn btn-soft btn-block" onClick={() => void tracar(modo)} disabled={!minhaLoc || !center || routing}>
+        <button className="btn btn-soft btn-block" onClick={() => void tracar(modo)} disabled={!minhaLoc || routing}>
           {routing ? <Loader2 size={16} className="spin" /> : <Navigation size={16} />}
           Traçar rota até o centro
         </button>
@@ -407,6 +419,7 @@ export function RadarMapPage() {
           </LayersControl>
 
           <ClickToSetCenter onSet={definirCentro} />
+          <TrackCenter onMove={setMapCenter} />
           <FlyTo target={focus} />
 
           {/* Regiões salvas (overlay informativo) */}
@@ -421,12 +434,10 @@ export function RadarMapPage() {
             </Circle>
           ))}
 
-          {/* Região atual (centro + raio) */}
+          {/* Região atual (centro + raio) — sempre visível: ponto fixado ou meio do mapa */}
+          <Circle center={[effectiveCenter.lat, effectiveCenter.lng]} radius={raioKm * 1000} pathOptions={{ color: VERDE_DEEP, weight: 2, fillColor: VERDE, fillOpacity: 0.12 }} />
           {center && (
-            <>
-              <Circle center={[center.lat, center.lng]} radius={raioKm * 1000} pathOptions={{ color: VERDE_DEEP, weight: 2, fillColor: VERDE, fillOpacity: 0.12 }} />
-              <CircleMarker center={[center.lat, center.lng]} radius={7} pathOptions={{ color: '#fff', weight: 2, fillColor: VERDE, fillOpacity: 1 }} />
-            </>
+            <CircleMarker center={[center.lat, center.lng]} radius={7} pathOptions={{ color: '#fff', weight: 2, fillColor: VERDE, fillOpacity: 1 }} />
           )}
 
           {/* Minha localização */}
@@ -441,15 +452,18 @@ export function RadarMapPage() {
         </MapContainer>
 
         {!center && (
-          <div style={{
-            position: 'absolute', bottom: 24, left: '50%', transform: 'translateX(-50%)',
-            zIndex: 1000, pointerEvents: 'none', background: 'var(--bg-elev)',
-            border: '1px solid var(--border)', borderRadius: 999, padding: '8px 16px',
-            boxShadow: 'var(--shadow-pop)', fontSize: 13, fontWeight: 600, color: 'var(--text)',
-            display: 'inline-flex', alignItems: 'center', gap: 8,
-          }}>
-            <Crosshair size={15} style={{ color: VERDE_DEEP }} /> Clique no mapa para marcar o centro
-          </div>
+          <>
+            <div className="map-crosshair"><Crosshair size={30} strokeWidth={1.75} /></div>
+            <div style={{
+              position: 'absolute', bottom: 72, left: '50%', transform: 'translateX(-50%)',
+              zIndex: 1000, pointerEvents: 'none', background: 'var(--bg-elev)',
+              border: '1px solid var(--border)', borderRadius: 999, padding: '8px 16px',
+              boxShadow: 'var(--shadow-pop)', fontSize: 13, fontWeight: 600, color: 'var(--text)',
+              display: 'inline-flex', alignItems: 'center', gap: 8, maxWidth: 'calc(100% - 24px)',
+            }}>
+              <Crosshair size={15} style={{ color: VERDE_DEEP, flexShrink: 0 }} /> Arraste o mapa pra posicionar · clique pra fixar
+            </div>
+          </>
         )}
       </div>
     </div>

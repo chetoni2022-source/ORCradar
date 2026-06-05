@@ -1,11 +1,18 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <!-- "O"-radar do ORCradar. Adapta o verde ao tema do navegador:
+       claro -> verde mais profundo (contraste em fundo branco);
+       escuro -> verde mais vivo (destaca em fundo escuro). -->
   <style>
-    .o { fill: #0A0A0A; }
-    @media (prefers-color-scheme: dark) { .o { fill: #FAFAFA; } }
+    .rk { stroke: #00A058; }
+    .fk { fill: #00A058; }
+    @media (prefers-color-scheme: dark) {
+      .rk { stroke: #20D982; }
+      .fk { fill: #20D982; }
+    }
   </style>
-  <text x="50%" y="50%" dy="0.36em" text-anchor="middle"
-        font-family="Inter, Helvetica, Arial, sans-serif"
-        font-weight="800" font-size="42" letter-spacing="-2">
-    <tspan class="o">O</tspan><tspan fill="#00C46A">r</tspan>
-  </text>
+  <circle class="rk" cx="50" cy="50" r="36.08" fill="none" stroke-width="9.84"/>
+  <circle class="rk" cx="50" cy="50" r="19.94" fill="none" stroke-width="4.10"/>
+  <line class="rk" x1="50" y1="50" x2="70.27" y2="29.73" stroke-width="4.10" stroke-linecap="round"/>
+  <circle class="fk" cx="50" cy="50" r="3.69"/>
+  <circle class="fk" cx="67.63" cy="32.37" r="6.56"/>
 </svg>

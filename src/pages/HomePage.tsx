@@ -67,7 +67,7 @@ export function HomePage({ onOpenMapa }: HomePageProps) {
         </section>
 
         {/* Stats ----------------------------------------------------------- */}
-        <section style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, marginBottom: 36 }}>
+        <section className="grid-auto-3" style={{ marginBottom: 36 }}>
           <div className="card stat">
             <div className="stat-label">Fase atual</div>
             <div className="stat-value">1</div>
@@ -150,7 +150,7 @@ export function HomePage({ onOpenMapa }: HomePageProps) {
             <div className="t-h2">Escopo do ORCradar</div>
             <div className="t-body t-muted">As duas únicas tabelas que o ORCradar gerencia no banco.</div>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 16 }}>
+          <div className="grid-auto-2">
             {TABELAS.map((t) => {
               const Icon = t.icon;
               return (
