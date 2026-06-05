@@ -1,6 +1,8 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Loader2, AlertCircle, Target, Star, Phone, Globe, MapPin } from 'lucide-react';
-import { listAllLeads, type LeadMapa } from '../lib/leads';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Loader2, AlertCircle, Target, Star, Phone, Globe, MapPin, AtSign, Check, CheckCheck, Send, X, Download } from 'lucide-react';
+import { listAllLeads, linkSeguro, type LeadMapa } from '../lib/leads';
+import { enviarLoteParaCrm } from '../lib/crm';
+import { leadsParaCsv, baixarCsv } from '../lib/csv';
 import { ScoreBadge } from '../components/ScoreBadge';
 import { calcularScore } from '../lib/score';
 
@@ -9,20 +11,22 @@ const FILTROS = [
   { k: 'todos', label: 'Todos' }, { k: 'verde', label: 'Verde' }, { k: 'amarelo', label: 'Amarelo' }, { k: 'vermelho', label: 'Vermelho' },
 ];
 const STATUS = [
-  { k: 'todos', label: 'Todos' }, { k: 'revisar', label: 'A revisar' }, { k: 'aprovados', label: 'Aprovados' }, { k: 'descartados', label: 'Descartados' },
+  { k: 'todos', label: 'Todos' }, { k: 'revisar', label: 'A revisar' }, { k: 'aprovados', label: 'No CRM' }, { k: 'descartados', label: 'Descartados' },
 ];
 
 function statusMatch(l: LeadMapa, k: string) {
-  if (k === 'revisar') return !l.aprovado && l.etapa !== 'perdido';
-  if (k === 'aprovados') return l.aprovado;
+  if (k === 'revisar') return !l.enviado_crm && l.etapa !== 'perdido';
+  if (k === 'aprovados') return l.enviado_crm;
   if (k === 'descartados') return l.etapa === 'perdido';
   return true;
 }
 function statusBadge(l: LeadMapa) {
   if (l.etapa === 'perdido') return <span className="badge badge-error">descartado</span>;
-  if (l.aprovado) return <span className="badge badge-success">aprovado</span>;
+  if (l.enviado_crm) return <span className="badge badge-success">no CRM</span>;
   return null;
 }
+/** Pode ser enviado pro CRM (ainda não foi e não está descartado). */
+const enviavel = (l: LeadMapa) => !l.enviado_crm && l.etapa !== 'perdido';
 
 type Props = { onReview: (lead: LeadMapa) => void; leadsVersion: number };
 
@@ -34,16 +38,18 @@ export function LeadsPage({ onReview, leadsVersion }: Props) {
   const [reg, setReg] = useState('todas');
   const [stat, setStat] = useState('todos');
 
-  useEffect(() => {
-    let alive = true;
-    (async () => {
-      setLoading(true); setError(null);
-      try { const l = await listAllLeads(); if (alive) setLeads(l); }
-      catch (e) { if (alive) setError(e instanceof Error ? e.message : 'Falha ao carregar leads.'); }
-      finally { if (alive) setLoading(false); }
-    })();
-    return () => { alive = false; };
-  }, [leadsVersion]);
+  const [selMode, setSelMode] = useState(false);
+  const [sel, setSel] = useState<Set<string>>(new Set());
+  const [bulkBusy, setBulkBusy] = useState(false);
+
+  const load = useCallback(async () => {
+    setLoading(true); setError(null);
+    try { setLeads(await listAllLeads()); }
+    catch (e) { setError(e instanceof Error ? e.message : 'Falha ao carregar leads.'); }
+    finally { setLoading(false); }
+  }, []);
+
+  useEffect(() => { void load(); }, [load, leadsVersion]);
 
   const regioes = useMemo(() => Array.from(new Set(leads.map((l) => l.regiao).filter(Boolean))) as string[], [leads]);
   const enriched = useMemo(
@@ -60,14 +66,57 @@ export function LeadsPage({ onReview, leadsVersion }: Props) {
     return c;
   }, [enriched]);
 
+  const selecionaveis = useMemo(() => filtered.filter(({ l }) => enviavel(l)).map(({ l }) => l), [filtered]);
+
+  function toggleSel(id: string) {
+    setSel((prev) => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  }
+  function selecionarTodos() { setSel(new Set(selecionaveis.map((l) => l.id))); }
+  function limparSel() { setSel(new Set()); }
+  function sairSelecao() { setSelMode(false); setSel(new Set()); }
+
+  async function enviarSelecionados() {
+    const alvo = leads.filter((l) => sel.has(l.id) && enviavel(l));
+    if (alvo.length === 0) return;
+    if (!window.confirm(`Enviar ${alvo.length} ${alvo.length === 1 ? 'lead' : 'leads'} pro CRM da ORCtech com todas as informações?`)) return;
+    setBulkBusy(true);
+    try {
+      const { enviados, falhas } = await enviarLoteParaCrm(alvo);
+      await load();
+      sairSelecao();
+      if (falhas > 0) alert(`${enviados} enviados. ${falhas} falharam — tente esses de novo.`);
+    } catch (e) { alert(e instanceof Error ? e.message : 'Falha no envio em lote.'); }
+    finally { setBulkBusy(false); }
+  }
+
+  function clickCard(l: LeadMapa) {
+    if (selMode) { if (enviavel(l)) toggleSel(l.id); }
+    else onReview(l);
+  }
+
+  function exportarCsv() {
+    const lista = filtered.map(({ l }) => l);
+    if (lista.length === 0) return;
+    const hoje = new Date().toISOString().slice(0, 10);
+    baixarCsv(`leads-orcradar-${hoje}.csv`, leadsParaCsv(lista));
+  }
+
   return (
     <div className="screen"><div className="screen-inner">
       <div className="screen-head">
         <div><h1 className="t-h1">Leads</h1><p>Revise, aprove e mande o WhatsApp. Clique num lead pra abrir.</p></div>
-        <div className="row" style={{ gap: 6 }}>
-          <span className="badge badge-success"><span className="dot" /> {contagem.verde}</span>
-          <span className="badge badge-warning"><span className="dot" /> {contagem.amarelo}</span>
-          <span className="badge badge-error"><span className="dot" /> {contagem.vermelho}</span>
+        <div className="row" style={{ gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+          <div className="row" style={{ gap: 6 }}>
+            <span className="badge badge-success"><span className="dot" /> {contagem.verde}</span>
+            <span className="badge badge-warning"><span className="dot" /> {contagem.amarelo}</span>
+            <span className="badge badge-error"><span className="dot" /> {contagem.vermelho}</span>
+          </div>
+          <button className="btn btn-secondary btn-sm" onClick={exportarCsv} disabled={filtered.length === 0} title="Baixar CSV (abre no Excel)">
+            <Download size={15} /> CSV
+          </button>
+          <button className={`btn btn-sm ${selMode ? 'btn-primary' : 'btn-secondary'}`} onClick={() => (selMode ? sairSelecao() : setSelMode(true))}>
+            <CheckCheck size={15} /> {selMode ? 'Sair da seleção' : 'Selecionar pro CRM'}
+          </button>
         </div>
       </div>
 
@@ -105,33 +154,55 @@ export function LeadsPage({ onReview, leadsVersion }: Props) {
         <div className="card empty-state"><div className="t-h3">Nada com esse filtro</div><div className="t-muted">Tente outra cor, status ou região.</div></div>
       ) : (
         <div className="leads-grid">
-          {filtered.map(({ l, sc }) => (
-            <div key={l.id} className={`lead-card s-${sc.cor}`} role="button" tabIndex={0} onClick={() => onReview(l)}
-              onKeyDown={(e) => { if (e.key === 'Enter') onReview(l); }}>
-              <div className="between" style={{ alignItems: 'flex-start', gap: 8 }}>
-                <div className="lead-card-name">{l.nome_empresa}</div>
-                <ScoreBadge lead={l} />
+          {filtered.map(({ l, sc }) => {
+            const checked = sel.has(l.id);
+            const podeSel = enviavel(l);
+            return (
+              <div key={l.id} className={`lead-card s-${sc.cor} ${selMode && podeSel ? 'is-selmode' : ''}`} role="button" tabIndex={0}
+                onClick={() => clickCard(l)} onKeyDown={(e) => { if (e.key === 'Enter') clickCard(l); }}>
+                {selMode && podeSel && (
+                  <span className={`lead-check ${checked ? 'is-on' : ''}`} onClick={(e) => { e.stopPropagation(); toggleSel(l.id); }}>
+                    {checked && <Check size={14} strokeWidth={3} />}
+                  </span>
+                )}
+                <div className="between" style={{ alignItems: 'flex-start', gap: 8 }}>
+                  <div className="lead-card-name">{l.nome_empresa}</div>
+                  <ScoreBadge lead={l} />
+                </div>
+                <div className="lead-card-meta">
+                  {l.nota_media != null ? (
+                    <span className="row" style={{ gap: 5 }}><Star size={13} fill="#F59E0B" color="#F59E0B" /> <span className="tnum" style={{ fontWeight: 600, color: 'var(--text)' }}>{l.nota_media}</span> <span className="t-faint">· {l.num_avaliacoes} avaliações</span></span>
+                  ) : <span className="t-faint">sem avaliações</span>}
+                  {l.telefone && <span className="row" style={{ gap: 5 }}><Phone size={13} /> <span className="tnum">{l.telefone}</span></span>}
+                </div>
+                <div className="row-wrap" style={{ gap: 6 }}>
+                  {statusBadge(l)}
+                  {l.segmento && <span className="badge badge-neutral">{l.segmento}</span>}
+                  {l.regiao && <span className="badge badge-outline"><MapPin size={11} /> {l.regiao}</span>}
+                </div>
+                <div className="lead-card-foot">
+                  <div className="row" style={{ gap: 10 }} onClick={(e) => e.stopPropagation()}>
+                    {linkSeguro(l.link_maps) && <a className="lead-card-maps" href={linkSeguro(l.link_maps)} target="_blank" rel="noreferrer" title="Google Maps"><MapPin size={14} /></a>}
+                    {linkSeguro(l.instagram) && <a className="lead-card-maps" href={linkSeguro(l.instagram)} target="_blank" rel="noreferrer" title="Instagram" style={{ color: '#C13584' }}><AtSign size={14} /></a>}
+                    {linkSeguro(l.site_url) && <a className="lead-card-maps" href={linkSeguro(l.site_url)} target="_blank" rel="noreferrer" title="Site"><Globe size={14} /></a>}
+                  </div>
+                  <span className="lead-card-open">{selMode ? (podeSel ? (checked ? 'Selecionado' : 'Selecionar') : 'já no CRM') : 'Revisar →'}</span>
+                </div>
               </div>
-              <div className="lead-card-meta">
-                {l.nota_media != null ? (
-                  <span className="row" style={{ gap: 5 }}><Star size={13} fill="#F59E0B" color="#F59E0B" /> <span className="tnum" style={{ fontWeight: 600, color: 'var(--text)' }}>{l.nota_media}</span> <span className="t-faint">· {l.num_avaliacoes} avaliações</span></span>
-                ) : <span className="t-faint">sem avaliações</span>}
-                {l.telefone && <span className="row" style={{ gap: 5 }}><Phone size={13} /> <span className="tnum">{l.telefone}</span></span>}
-              </div>
-              <div className="row-wrap" style={{ gap: 6 }}>
-                {statusBadge(l)}
-                {l.segmento && <span className="badge badge-neutral">{l.segmento}</span>}
-                {l.tem_site && <span className="badge badge-outline"><Globe size={11} /> site</span>}
-                {l.regiao && <span className="badge badge-outline"><MapPin size={11} /> {l.regiao}</span>}
-              </div>
-              <div className="lead-card-foot">
-                {l.link_maps ? (
-                  <a className="lead-card-maps" href={l.link_maps} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}><Globe size={13} /> Google Maps</a>
-                ) : <span />}
-                <span className="lead-card-open">Revisar →</span>
-              </div>
-            </div>
-          ))}
+            );
+          })}
+        </div>
+      )}
+
+      {selMode && (
+        <div className="bulk-bar">
+          <span className="bulk-count">{sel.size} {sel.size === 1 ? 'selecionado' : 'selecionados'}</span>
+          <button className="btn btn-ghost btn-sm" onClick={selecionarTodos} disabled={selecionaveis.length === 0}>Selecionar todos ({selecionaveis.length})</button>
+          {sel.size > 0 && <button className="btn btn-ghost btn-sm" onClick={limparSel}><X size={14} /> Limpar</button>}
+          <span className="grow" />
+          <button className="btn btn-primary" onClick={() => void enviarSelecionados()} disabled={sel.size === 0 || bulkBusy}>
+            {bulkBusy ? <Loader2 size={16} className="spin" /> : <Send size={16} />} Enviar {sel.size > 0 ? sel.size : ''} pro CRM
+          </button>
         </div>
       )}
     </div></div>

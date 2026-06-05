@@ -7,10 +7,12 @@
  */
 
 export type EtapaLead =
-  | 'novo'
-  | 'a_contatar'
+  | 'triagem'      // lead cru, em revisão no ORCradar (fora do funil do CRM)
+  | 'a_contatar'   // aprovado e enviado pro CRM da ORCtech
   | 'contatado'
-  | 'reuniao'
+  | 'visitado'
+  | 'proposta_enviada'
+  | 'testando'
   | 'fechado'
   | 'perdido';
 
@@ -26,6 +28,8 @@ export interface CrmLead {
   telefone: string | null;
   whatsapp: string | null;
   instagram: string | null;
+  site_url: string | null;
+  place_id: string | null;
   endereco: string | null;
   cidade: string | null;
   link_maps: string | null;
@@ -50,6 +54,9 @@ export interface CrmLead {
   origem: string;
   aprovado: boolean;
   duplicado: boolean;
+  /** ORCradar — Fase 5: lead já promovido pro funil do CRM da ORCtech. */
+  enviado_crm: boolean;
+  enviado_crm_at: string | null;
   created_at: string;
   updated_at: string;
 }

@@ -7,23 +7,30 @@
  */
 
 export type LatLng = { lat: number; lng: number };
+/** Localização + precisão (em metros) reportada pelo navegador. */
+export type MinhaLoc = LatLng & { accuracy: number };
 export type ModoRota = 'carro' | 'bici' | 'pe';
 
-/** Pega a localização atual do usuário (pede permissão ao navegador). */
-export function getMinhaLocalizacao(): Promise<LatLng> {
+/**
+ * Pega a localização atual do usuário (pede permissão ao navegador).
+ * Força leitura FRESCA (maximumAge: 0) e alta precisão — no desktop sem GPS
+ * a precisão vem do Wi-Fi/IP e pode errar bastante (por isso devolvemos
+ * `accuracy` pra avisar e deixamos o pino arrastável no mapa).
+ */
+export function getMinhaLocalizacao(): Promise<MinhaLoc> {
   return new Promise((resolve, reject) => {
     if (typeof navigator === 'undefined' || !navigator.geolocation) {
       reject(new Error('Geolocalização não é suportada neste navegador.'));
       return;
     }
     navigator.geolocation.getCurrentPosition(
-      (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+      (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: pos.coords.accuracy }),
       (err) => {
-        if (err.code === err.PERMISSION_DENIED) reject(new Error('Permissão de localização negada.'));
+        if (err.code === err.PERMISSION_DENIED) reject(new Error('Permissão de localização negada. Libere o acesso à localização no navegador.'));
         else if (err.code === err.TIMEOUT) reject(new Error('Tempo esgotado ao obter a localização.'));
         else reject(new Error('Não foi possível obter a localização.'));
       },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 },
+      { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 },
     );
   });
 }

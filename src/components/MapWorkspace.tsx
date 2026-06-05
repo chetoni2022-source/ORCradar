@@ -13,6 +13,8 @@ import {
   getMinhaLocalizacao, buscarEndereco, tracarRota, formatarDuracao,
   type ModoRota, type Rota, type GeocodeResult,
 } from '../lib/geo';
+import { startFaviconRadar, stopFaviconRadar } from '../lib/favicon';
+import { pedirPermissaoNotificacao, notificar } from '../lib/notify';
 import { STREETS_STYLE, SATELLITE_STYLE, type Basemap } from '../lib/mapStyles';
 import type { RadarRegiao } from '../types/database';
 
@@ -82,6 +84,7 @@ export function MapWorkspace({ regions, reloadRegions, activeRegionId, setActive
 
   const [minhaLoc, setMinhaLoc] = useState<{ lat: number; lng: number } | null>(null);
   const [locating, setLocating] = useState(false);
+  const [locImprecisa, setLocImprecisa] = useState(false);
   const [routeOpen, setRouteOpen] = useState(false);
   const [modo, setModo] = useState<ModoRota>('carro');
   const [rota, setRota] = useState<Rota | null>(null);
@@ -169,7 +172,10 @@ export function MapWorkspace({ regions, reloadRegions, activeRegionId, setActive
 
   async function raspar() {
     if (!activeRegion) return;
+    const nomeRegiao = activeRegion.nome || 'região';
+    pedirPermissaoNotificacao();
     setScrape({ status: 'running' }); setLogIdx(0);
+    startFaviconRadar(); // radar girando no favicon enquanto raspa
     const timer = window.setInterval(() => setLogIdx((i) => (i + 1) % LOGS.length), 7000);
     try {
       const result = await rasparRegiao(activeRegion.id, maxLeads);
@@ -178,14 +184,25 @@ export function MapWorkspace({ regions, reloadRegions, activeRegionId, setActive
       const fresh = await listLeadsByRegiao(activeRegion.nome);
       setLeads(fresh);
       fitToLeads(fresh);
+      notificar('Raspagem concluída ✓', `${result.inseridos} leads novos em ${nomeRegiao}.`);
     } catch (e) {
-      setScrape({ status: 'error', error: e instanceof Error ? e.message : 'Falha na raspagem.' });
-    } finally { window.clearInterval(timer); }
+      const msg = e instanceof Error ? e.message : 'Falha na raspagem.';
+      setScrape({ status: 'error', error: msg });
+      notificar('Raspagem falhou', msg);
+    } finally { window.clearInterval(timer); stopFaviconRadar(); }
   }
+
+  // Para o radar do favicon se sair da tela no meio da raspagem.
+  useEffect(() => () => stopFaviconRadar(), []);
 
   async function localizar() {
     setLocating(true);
-    try { const loc = await getMinhaLocalizacao(); setMinhaLoc(loc); mapRef.current?.flyTo({ center: [loc.lng, loc.lat], zoom: 14, duration: 800 }); }
+    try {
+      const loc = await getMinhaLocalizacao();
+      setMinhaLoc({ lat: loc.lat, lng: loc.lng });
+      setLocImprecisa(loc.accuracy > 300); // sem GPS no PC a precisão é baixa
+      mapRef.current?.flyTo({ center: [loc.lng, loc.lat], zoom: loc.accuracy > 1000 ? 12 : 15, duration: 800 });
+    }
     catch (e) { alert(e instanceof Error ? e.message : 'Não consegui te localizar.'); }
     finally { setLocating(false); }
   }
@@ -250,7 +267,14 @@ export function MapWorkspace({ regions, reloadRegions, activeRegionId, setActive
           }} />
         </Source>
 
-        {minhaLoc && <Marker longitude={minhaLoc.lng} latitude={minhaLoc.lat}><span style={{ width: 16, height: 16, borderRadius: '50%', background: '#2563EB', border: '3px solid #fff', boxShadow: '0 0 0 4px rgba(37,99,235,0.25)', display: 'block' }} /></Marker>}
+        {minhaLoc && (
+          <Marker
+            longitude={minhaLoc.lng} latitude={minhaLoc.lat} draggable
+            onDragEnd={(e) => { setMinhaLoc({ lat: e.lngLat.lat, lng: e.lngLat.lng }); setLocImprecisa(false); }}
+          >
+            <span title="Você (arraste pra ajustar)" style={{ width: 16, height: 16, borderRadius: '50%', background: '#2563EB', border: '3px solid #fff', boxShadow: '0 0 0 4px rgba(37,99,235,0.25)', display: 'block', cursor: 'grab' }} />
+          </Marker>
+        )}
 
         {selectedLead && selectedLead.latitude != null && (
           <Popup longitude={selectedLead.longitude as number} latitude={selectedLead.latitude as number} anchor="bottom" offset={14} closeOnClick={false} onClose={() => setSelectedLead(null)} maxWidth="280px">
@@ -270,6 +294,15 @@ export function MapWorkspace({ regions, reloadRegions, activeRegionId, setActive
 
       {/* Mira central (modo desenhar) */}
       {showMira && <div className="map-crosshair"><Crosshair size={30} strokeWidth={1.75} /></div>}
+
+      {/* Aviso: localização imprecisa (desktop sem GPS) */}
+      {locImprecisa && minhaLoc && (
+        <div className="loc-warn glass">
+          <AlertCircle size={15} style={{ color: 'var(--warning)', flexShrink: 0 }} />
+          <span>Localização aproximada (sem GPS no computador). Arraste o ponto azul pra ajustar.</span>
+          <button className="btn btn-ghost btn-sm" style={{ width: 26, height: 26, padding: 0 }} onClick={() => setLocImprecisa(false)}><X size={14} /></button>
+        </div>
+      )}
 
       {/* Busca */}
       <div className="map-search2">
@@ -372,8 +405,15 @@ export function MapWorkspace({ regions, reloadRegions, activeRegionId, setActive
               {tokenSaved && <div className="t-caption t-faint" style={{ display: 'flex', gap: 6, alignItems: 'center' }}><Check size={13} color="#00A058" /> Token conectado</div>}
               <div className="field">
                 <label className="field-label">Quantos leads buscar?</label>
-                <div className="seg">{QTDS.map((n) => <button key={n} className={`seg-item ${maxLeads === n ? 'is-on' : ''}`} onClick={() => setMaxLeads(n)}>{n}</button>)}</div>
-                <div className="field-hint">Mais leads = mais tempo e mais créditos do Apify.</div>
+                <div className="row" style={{ gap: 8 }}>
+                  <div className="seg" style={{ flex: 1 }}>{QTDS.map((n) => <button key={n} className={`seg-item ${maxLeads === n ? 'is-on' : ''}`} onClick={() => setMaxLeads(n)}>{n}</button>)}</div>
+                  <input
+                    className="input" type="number" min={1} max={120} value={maxLeads}
+                    onChange={(e) => setMaxLeads(Math.max(1, Math.min(120, Number(e.target.value) || 1)))}
+                    style={{ width: 84, textAlign: 'center' }} aria-label="Quantidade personalizada"
+                  />
+                </div>
+                <div className="field-hint">Digite o número que quiser (até 120). Mais leads = mais tempo e créditos do Apify.</div>
               </div>
               <button className="btn btn-primary btn-block btn-lg" onClick={() => void raspar()} disabled={!tokenSaved}><DownloadCloud size={18} /> Raspar {maxLeads} leads</button>
               <button className="btn btn-ghost btn-sm" onClick={novaRegiao}><Plus size={15} /> Nova região</button>

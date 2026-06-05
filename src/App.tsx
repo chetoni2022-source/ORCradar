@@ -1,14 +1,18 @@
-import { useCallback, useEffect, useState, type ReactNode } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useState, type ReactNode } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { ShieldAlert, LogOut, Loader2 } from 'lucide-react';
 import { Sidebar, BottomTabBar } from './components/Shell';
-import { MapWorkspace } from './components/MapWorkspace';
-import { RegioesPage } from './pages/RegioesPage';
-import { LeadsPage } from './pages/LeadsPage';
-import { ConfigPage } from './pages/ConfigPage';
 import { LoginPage } from './pages/LoginPage';
-import { LeadDetailModal } from './components/LeadDetailModal';
 import { RadarMark } from './components/RadarMark';
+
+// Code-splitting: o mapa (MapLibre ~786 KB) e as páginas só carregam quando
+// abertas — o login e o primeiro paint ficam bem mais leves.
+const MapWorkspace = lazy(() => import('./components/MapWorkspace').then((m) => ({ default: m.MapWorkspace })));
+const RegioesPage = lazy(() => import('./pages/RegioesPage').then((m) => ({ default: m.RegioesPage })));
+const LeadsPage = lazy(() => import('./pages/LeadsPage').then((m) => ({ default: m.LeadsPage })));
+const AnalisePage = lazy(() => import('./pages/AnalisePage').then((m) => ({ default: m.AnalisePage })));
+const ConfigPage = lazy(() => import('./pages/ConfigPage').then((m) => ({ default: m.ConfigPage })));
+const LeadDetailModal = lazy(() => import('./components/LeadDetailModal').then((m) => ({ default: m.LeadDetailModal })));
 import { isSupabaseConfigured } from './lib/supabase';
 import { getSession, onAuthChange, checkOwner, signOut } from './lib/auth';
 import { listRegioes } from './lib/radarRegioes';
@@ -16,7 +20,7 @@ import type { RadarRegiao } from './types/database';
 import type { LeadMapa } from './lib/leads';
 
 export type Theme = 'light' | 'dark';
-export type View = 'mapa' | 'regioes' | 'leads' | 'config';
+export type View = 'mapa' | 'regioes' | 'leads' | 'analise' | 'config';
 
 function Splash({ label }: { label: string }) {
   return (
@@ -128,6 +132,7 @@ export default function App() {
       <div className="app-grid">
         <Sidebar view={view} onNavigate={setView} email={email} theme={theme} onToggleTheme={toggleTheme} onSignOut={() => void signOut()} counts={{ regioes: regions.length }} />
         <main className="app-main">
+         <Suspense fallback={<div className="row t-muted" style={{ gap: 8, padding: 28 }}><Loader2 size={16} className="spin" /> Carregando…</div>}>
           {view === 'mapa' && (
             <MapWorkspace
               regions={regions}
@@ -149,7 +154,9 @@ export default function App() {
             />
           )}
           {view === 'leads' && <LeadsPage onReview={setDetailLead} leadsVersion={leadsVersion} />}
+          {view === 'analise' && <AnalisePage leadsVersion={leadsVersion} />}
           {view === 'config' && <ConfigPage theme={theme} onToggleTheme={toggleTheme} email={email} />}
+         </Suspense>
         </main>
         <BottomTabBar view={view} onNavigate={setView} />
       </div>
@@ -158,7 +165,9 @@ export default function App() {
       content = (
         <>
           {content}
-          <LeadDetailModal lead={detailLead} onClose={() => setDetailLead(null)} onChanged={() => setLeadsVersion((v) => v + 1)} onOpenMapa={openLead} />
+          <Suspense fallback={null}>
+            <LeadDetailModal lead={detailLead} onClose={() => setDetailLead(null)} onChanged={() => setLeadsVersion((v) => v + 1)} onOpenMapa={openLead} />
+          </Suspense>
         </>
       );
     }

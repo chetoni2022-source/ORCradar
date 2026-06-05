@@ -1,7 +1,11 @@
 import type { StyleSpecification } from 'maplibre-gl';
 
-/** Estilo vetorial gratuito (sem chave) — mostra comércios/POIs como o Google Maps. */
-export const STREETS_STYLE = 'https://tiles.openfreemap.org/styles/liberty';
+/**
+ * Estilo de ruas no visual do Google Maps — Carto "Voyager" (vetorial, gratuito,
+ * SEM chave/API key). Paleta clara com ruas, POIs e rótulos parecidos com o
+ * Google. Substitui o OpenFreeMap pra ficar mais perto do que o dono pediu.
+ */
+export const STREETS_STYLE = 'https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json';
 
 /** Satélite (Esri World Imagery) montado como style raster. {z}/{y}/{x} — y antes de x. */
 export const SATELLITE_STYLE: StyleSpecification = {

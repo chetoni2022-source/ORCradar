@@ -1,4 +1,4 @@
-import { Map as MapIcon, Radar, Target, Settings, Sun, Moon, LogOut } from 'lucide-react';
+import { Map as MapIcon, Radar, Target, BarChart3, Settings, Sun, Moon, LogOut } from 'lucide-react';
 import { Logo } from './Logo';
 import type { View, Theme } from '../App';
 
@@ -6,6 +6,7 @@ export const NAV: { id: View; label: string; short: string; Icon: typeof MapIcon
   { id: 'mapa', label: 'Mapa', short: 'Mapa', Icon: MapIcon },
   { id: 'regioes', label: 'Regiões', short: 'Regiões', Icon: Radar },
   { id: 'leads', label: 'Leads', short: 'Leads', Icon: Target },
+  { id: 'analise', label: 'Análise', short: 'Análise', Icon: BarChart3 },
   { id: 'config', label: 'Configurações', short: 'Config', Icon: Settings },
 ];
 
@@ -25,14 +26,14 @@ export function Sidebar({ view, onNavigate, email, theme, onToggleTheme, onSignO
     <aside className="sidebar2">
       <div className="sidebar2-logo"><Logo size={20} /></div>
       <nav style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-        {NAV.slice(0, 3).map(({ id, label, Icon }) => (
+        {NAV.slice(0, 4).map(({ id, label, Icon }) => (
           <button key={id} className={`nav-item ${view === id ? 'is-active' : ''}`} onClick={() => onNavigate(id)}>
             <Icon size={18} /> <span className="grow">{label}</span>
             {counts?.[id] ? <span className="nav-count">{counts[id]}</span> : null}
           </button>
         ))}
         <div className="nav-section-label">Ferramentas</div>
-        {NAV.slice(3).map(({ id, label, Icon }) => (
+        {NAV.slice(4).map(({ id, label, Icon }) => (
           <button key={id} className={`nav-item ${view === id ? 'is-active' : ''}`} onClick={() => onNavigate(id)}>
             <Icon size={18} /> <span className="grow">{label}</span>
           </button>
@@ -45,7 +46,7 @@ export function Sidebar({ view, onNavigate, email, theme, onToggleTheme, onSignO
           <span className="avatar-sm">{initial}</span>
           <span className="grow" style={{ minWidth: 0 }}>
             <div className="t-caption" style={{ fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{email ?? '—'}</div>
-            <div className="t-caption t-faint">Dono · Fase 1</div>
+            <div className="t-caption t-faint">Dono da plataforma</div>
           </span>
         </div>
         <div className="row" style={{ gap: 6, marginTop: 6 }}>
