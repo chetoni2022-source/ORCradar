@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Loader2, AlertCircle, Target, Star, Check, Minus, MapPin } from 'lucide-react';
+import { Loader2, AlertCircle, Target, Star, Phone, Globe, MapPin, ArrowRight } from 'lucide-react';
 import { listAllLeads, type LeadMapa } from '../lib/leads';
+import { ScoreBadge } from '../components/ScoreBadge';
+import { calcularScore } from '../lib/score';
 
 const COR: Record<string, string> = { verde: '#00C46A', amarelo: '#F59E0B', vermelho: '#EF4444' };
 const FILTROS = [
@@ -31,22 +33,36 @@ export function LeadsPage({ onOpenLead }: Props) {
   }, []);
 
   const regioes = useMemo(() => Array.from(new Set(leads.map((l) => l.regiao).filter(Boolean))) as string[], [leads]);
-  const filtered = useMemo(
-    () => leads.filter((l) => (cor === 'todos' || l.score_cor === cor) && (reg === 'todas' || l.regiao === reg)),
-    [leads, cor, reg],
+  // Score calculado no cliente (consistente com o badge) — ordena e filtra por ele.
+  const enriched = useMemo(
+    () => leads.map((l) => ({ l, sc: calcularScore(l) })).sort((a, b) => b.sc.score - a.sc.score),
+    [leads],
   );
+  const filtered = useMemo(
+    () => enriched.filter(({ l, sc }) => (cor === 'todos' || sc.cor === cor) && (reg === 'todas' || l.regiao === reg)),
+    [enriched, cor, reg],
+  );
+  const contagem = useMemo(() => {
+    const c = { verde: 0, amarelo: 0, vermelho: 0 } as Record<string, number>;
+    for (const { sc } of enriched) c[sc.cor]++;
+    return c;
+  }, [enriched]);
 
   return (
     <div className="screen"><div className="screen-inner">
       <div className="screen-head">
         <div><h1 className="t-h1">Leads</h1><p>Os estabelecimentos que o radar encontrou.</p></div>
-        <span className="badge badge-neutral">{filtered.length} de {leads.length}</span>
+        <div className="row" style={{ gap: 6 }}>
+          <span className="badge badge-success"><span className="dot" /> {contagem.verde}</span>
+          <span className="badge badge-warning"><span className="dot" /> {contagem.amarelo}</span>
+          <span className="badge badge-error"><span className="dot" /> {contagem.vermelho}</span>
+        </div>
       </div>
 
       <div className="row" style={{ gap: 12, marginBottom: 18, flexWrap: 'wrap' }}>
         <div className="seg" style={{ width: 'auto' }}>
           {FILTROS.map((f) => (
-            <button key={f.k} className={`seg-item ${cor === f.k ? 'is-on' : ''}`} onClick={() => setCor(f.k)} style={{ flex: '0 0 auto', padding: '0 14px' }}>
+            <button key={f.k} className={`seg-item ${cor === f.k ? 'is-on' : ''}`} onClick={() => setCor(f.k)} style={{ flex: '0 0 auto', padding: '0 13px' }}>
               {f.k !== 'todos' && <span className="score-dot" style={{ background: COR[f.k] }} />} {f.label}
             </button>
           ))}
@@ -55,6 +71,7 @@ export function LeadsPage({ onOpenLead }: Props) {
           <option value="todas">Todas as regiões</option>
           {regioes.map((r) => <option key={r} value={r}>{r}</option>)}
         </select>
+        <span className="t-caption t-muted" style={{ marginLeft: 'auto', alignSelf: 'center' }}>{filtered.length} de {leads.length}</span>
       </div>
 
       {loading ? (
@@ -70,28 +87,33 @@ export function LeadsPage({ onOpenLead }: Props) {
       ) : filtered.length === 0 ? (
         <div className="card empty-state"><div className="t-h3">Nada com esse filtro</div><div className="t-muted">Tente outra cor ou região.</div></div>
       ) : (
-        <div className="card" style={{ padding: 0, overflowX: 'auto' }}>
-          <table className="leads-table">
-            <thead>
-              <tr>
-                <th>Empresa</th><th>Score</th><th>Nota</th><th className="tbl-hide-md">Telefone</th>
-                <th className="tbl-hide-md">Site</th><th className="tbl-hide-md">Região</th><th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((l) => (
-                <tr key={l.id} onClick={() => onOpenLead(l)}>
-                  <td style={{ fontWeight: 600, maxWidth: 240, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l.nome_empresa}</td>
-                  <td><span className={`badge badge-${l.score_cor}`}><span className="dot" />{l.score_cor}</span></td>
-                  <td className="tnum">{l.nota_media != null ? <span className="row" style={{ gap: 4 }}><Star size={12} fill="#F59E0B" color="#F59E0B" /> {l.nota_media} <span className="t-faint">({l.num_avaliacoes})</span></span> : '—'}</td>
-                  <td className="tbl-hide-md tnum">{l.telefone ?? '—'}</td>
-                  <td className="tbl-hide-md">{l.tem_site ? <Check size={15} color="#00A058" /> : <Minus size={15} color="#A1A1AA" />}</td>
-                  <td className="tbl-hide-md t-muted" style={{ maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l.regiao ?? '—'}</td>
-                  <td><span className="row" style={{ gap: 4, color: 'var(--tech-deep)', fontWeight: 600, fontSize: 12.5, whiteSpace: 'nowrap' }}><MapPin size={13} /> Ver</span></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="leads-grid">
+          {filtered.map(({ l, sc }) => (
+            <div key={l.id} className={`lead-card s-${sc.cor}`} role="button" tabIndex={0} onClick={() => onOpenLead(l)}
+              onKeyDown={(e) => { if (e.key === 'Enter') onOpenLead(l); }}>
+              <div className="between" style={{ alignItems: 'flex-start', gap: 8 }}>
+                <div className="lead-card-name">{l.nome_empresa}</div>
+                <ScoreBadge lead={l} />
+              </div>
+              <div className="lead-card-meta">
+                {l.nota_media != null ? (
+                  <span className="row" style={{ gap: 5 }}><Star size={13} fill="#F59E0B" color="#F59E0B" /> <span className="tnum" style={{ fontWeight: 600, color: 'var(--text)' }}>{l.nota_media}</span> <span className="t-faint">· {l.num_avaliacoes} avaliações</span></span>
+                ) : <span className="t-faint">sem avaliações</span>}
+                {l.telefone && <span className="row" style={{ gap: 5 }}><Phone size={13} /> <span className="tnum">{l.telefone}</span></span>}
+              </div>
+              <div className="row-wrap" style={{ gap: 6 }}>
+                {l.segmento && <span className="badge badge-neutral">{l.segmento}</span>}
+                {l.tem_site && <span className="badge badge-outline"><Globe size={11} /> site</span>}
+                {l.regiao && <span className="badge badge-outline"><MapPin size={11} /> {l.regiao}</span>}
+              </div>
+              <div className="lead-card-foot">
+                {l.link_maps ? (
+                  <a className="lead-card-maps" href={l.link_maps} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}><Globe size={13} /> Google Maps</a>
+                ) : <span />}
+                <span className="lead-card-open">Ver no mapa <ArrowRight size={13} /></span>
+              </div>
+            </div>
+          ))}
         </div>
       )}
     </div></div>

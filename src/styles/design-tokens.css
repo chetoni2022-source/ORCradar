@@ -793,3 +793,43 @@ html.dark, html.theme-dark {
   .fab-cluster { bottom: 84px; }
   .map-dock { bottom: 16px; }
 }
+
+/* ── Score badge + popover explicativo ───────────────────────────── */
+.score-badge-wrap { position: relative; display: inline-flex; outline: none; }
+.score-badge { cursor: help; font-variant-numeric: tabular-nums; }
+.score-pop {
+  position: absolute; top: calc(100% + 8px); right: 0; z-index: 90;
+  width: 248px; padding: 12px 14px; border-radius: 14px;
+  background: var(--bg-elev); border: 1px solid var(--border); box-shadow: var(--shadow-pop);
+  opacity: 0; transform: translateY(-4px); pointer-events: none; text-align: left;
+  transition: opacity 140ms ease, transform 140ms ease;
+}
+.score-badge-wrap:hover .score-pop, .score-badge-wrap:focus-within .score-pop { opacity: 1; transform: translateY(0); pointer-events: auto; }
+.score-pop-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.score-pop-total { font-size: 19px; font-weight: 800; letter-spacing: -0.02em; }
+.score-pop-row { display: grid; grid-template-columns: 1fr 54px 26px; align-items: center; gap: 8px; margin-bottom: 6px; }
+.score-pop-label { font-size: 12px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.score-pop-bar { height: 5px; border-radius: 999px; background: var(--bg-sunken); overflow: hidden; }
+.score-pop-bar > span { display: block; height: 100%; border-radius: 999px; transition: width 200ms ease; }
+.score-pop-pts { font-size: 11.5px; font-weight: 700; color: var(--text-muted); text-align: right; font-variant-numeric: tabular-nums; }
+.score-pop-hint { font-size: 11px; color: var(--text-faint); margin-top: 8px; line-height: 1.45; }
+
+/* ── Cards de lead (tela Leads) ──────────────────────────────────── */
+.leads-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; }
+.lead-card {
+  display: flex; flex-direction: column; gap: 10px; text-align: left; cursor: pointer; font-family: inherit;
+  background: var(--bg-elev); border: 1px solid var(--border); border-left: 3px solid var(--gray-300);
+  border-radius: 14px; padding: 14px 16px;
+  transition: border-color 120ms ease, box-shadow 160ms ease, transform 80ms ease;
+}
+.lead-card:hover { box-shadow: var(--shadow-soft); transform: translateY(-1px); border-color: var(--border-strong); }
+.lead-card.s-verde { border-left-color: #00C46A; }
+.lead-card.s-amarelo { border-left-color: #F59E0B; }
+.lead-card.s-vermelho { border-left-color: #EF4444; }
+.lead-card-name { font-weight: 700; font-size: 14.5px; color: var(--text); line-height: 1.25; }
+.lead-card-meta { display: flex; flex-direction: column; gap: 5px; font-size: 12.5px; color: var(--text-muted); }
+.lead-card-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: auto; padding-top: 10px; border-top: 1px solid var(--border); }
+.lead-card-open { font-size: 12px; font-weight: 600; color: var(--tech-deep); display: inline-flex; align-items: center; gap: 4px; }
+.theme-dark .lead-card-open, .dark .lead-card-open { color: var(--tech); }
+.lead-card-maps { font-size: 12px; font-weight: 600; color: var(--text-muted); text-decoration: none; display: inline-flex; align-items: center; gap: 5px; }
+.lead-card-maps:hover { color: var(--text); }

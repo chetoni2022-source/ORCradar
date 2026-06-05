@@ -13,6 +13,7 @@ export type LeadMapa = {
   cidade: string | null;
   link_maps: string | null;
   tem_site: boolean;
+  tem_fotos: boolean;
   num_avaliacoes: number;
   nota_media: number | null;
   score: number;
@@ -24,7 +25,7 @@ export type LeadMapa = {
 };
 
 const COLS =
-  'id,nome_empresa,segmento,regiao,telefone,whatsapp,endereco,cidade,link_maps,tem_site,num_avaliacoes,nota_media,score,score_cor,latitude,longitude,aprovado,duplicado';
+  'id,nome_empresa,segmento,regiao,telefone,whatsapp,endereco,cidade,link_maps,tem_site,tem_fotos,num_avaliacoes,nota_media,score,score_cor,latitude,longitude,aprovado,duplicado';
 
 /** Leads de uma região específica (só os que têm coordenadas — pro mapa). */
 export async function listLeadsByRegiao(nome: string | null): Promise<LeadMapa[]> {
@@ -35,7 +36,7 @@ export async function listLeadsByRegiao(nome: string | null): Promise<LeadMapa[]
     .eq('regiao', nome)
     .eq('origem', 'orcradar')
     .not('latitude', 'is', null)
-    .order('num_avaliacoes', { ascending: false })
+    .order('score', { ascending: false })
     .limit(800);
   if (error) throw new Error(error.message);
   return (data ?? []) as LeadMapa[];
@@ -48,7 +49,7 @@ export async function listAllLeads(): Promise<LeadMapa[]> {
     .from('crm_leads')
     .select(COLS)
     .eq('origem', 'orcradar')
-    .order('num_avaliacoes', { ascending: false })
+    .order('score', { ascending: false })
     .limit(2000);
   if (error) throw new Error(error.message);
   return (data ?? []) as LeadMapa[];

@@ -19,6 +19,7 @@ import type { RadarRegiao } from '../types/database';
 const COR_SCORE: Record<string, string> = { verde: '#00C46A', amarelo: '#F59E0B', vermelho: '#EF4444' };
 const SEGMENTOS = ['Oficina mecânica', 'Auto elétrica', 'Funilaria e pintura', 'Centro automotivo', 'Borracharia', 'Troca de óleo', 'Lava-rápido', 'Acessórios e som'];
 const CHIPS = ['Oficina mecânica', 'Auto elétrica', 'Borracharia', 'Centro automotivo'];
+const QTDS = [20, 50, 100];
 const MODOS: { id: ModoRota; label: string; Icon: typeof Car }[] = [
   { id: 'carro', label: 'Carro', Icon: Car }, { id: 'bici', label: 'Bici', Icon: Bike }, { id: 'pe', label: 'A pé', Icon: Footprints },
 ];
@@ -64,6 +65,7 @@ export function MapWorkspace({ regions, reloadRegions, activeRegionId, setActive
 
   const [tokenInput, setTokenInput] = useState(getApifyToken());
   const [tokenSaved, setTokenSaved] = useState(!!getApifyToken());
+  const [maxLeads, setMaxLeads] = useState(50);
 
   const [scrape, setScrape] = useState<ScrapeState | null>(null);
   const [logIdx, setLogIdx] = useState(0);
@@ -75,6 +77,7 @@ export function MapWorkspace({ regions, reloadRegions, activeRegionId, setActive
   const [q, setQ] = useState('');
   const [results, setResults] = useState<GeocodeResult[]>([]);
   const [searching, setSearching] = useState(false);
+  const skipSearch = useRef(false);
 
   const [minhaLoc, setMinhaLoc] = useState<{ lat: number; lng: number } | null>(null);
   const [locating, setLocating] = useState(false);
@@ -109,6 +112,17 @@ export function MapWorkspace({ regions, reloadRegions, activeRegionId, setActive
   useEffect(() => {
     if (focusLatLng) { mapRef.current?.flyTo({ center: [focusLatLng.lng, focusLatLng.lat], zoom: 16, duration: 900 }); clearFocus(); }
   }, [focusLatLng, clearFocus]);
+
+  // Preview da busca enquanto digita (debounced).
+  useEffect(() => {
+    if (skipSearch.current) { skipSearch.current = false; return; }
+    if (q.trim().length < 3) { setResults([]); return; }
+    const t = window.setTimeout(async () => {
+      setSearching(true);
+      try { setResults(await buscarEndereco(q)); } catch { setResults([]); } finally { setSearching(false); }
+    }, 450);
+    return () => window.clearTimeout(t);
+  }, [q]);
 
   // Círculo da região (verde) -------------------------------------------------
   const circleCenter: [number, number] = guideMode === 'draw' || !activeRegion
@@ -157,7 +171,7 @@ export function MapWorkspace({ regions, reloadRegions, activeRegionId, setActive
     setScrape({ status: 'running' }); setLogIdx(0);
     const timer = window.setInterval(() => setLogIdx((i) => (i + 1) % LOGS.length), 7000);
     try {
-      const result = await rasparRegiao(activeRegion.id);
+      const result = await rasparRegiao(activeRegion.id, maxLeads);
       setScrape({ status: 'done', result });
       reloadRegions();
       const fresh = await listLeadsByRegiao(activeRegion.nome);
@@ -193,7 +207,7 @@ export function MapWorkspace({ regions, reloadRegions, activeRegionId, setActive
   function irPara(r: GeocodeResult) {
     setPinned([r.lng, r.lat]); setGuideMode('draw'); setActiveRegionId(null);
     mapRef.current?.flyTo({ center: [r.lng, r.lat], zoom: 14, duration: 900 });
-    setResults([]); setQ(r.label.split(',').slice(0, 2).join(',').trim());
+    setResults([]); skipSearch.current = true; setQ(r.label.split(',').slice(0, 2).join(',').trim());
   }
 
   const stepActive: 1 | 2 | 3 = scrape?.status === 'done' ? 3 : guideMode === 'draw' ? 1 : 2;
@@ -355,7 +369,12 @@ export function MapWorkspace({ regions, reloadRegions, activeRegionId, setActive
                 </div>
               )}
               {tokenSaved && <div className="t-caption t-faint" style={{ display: 'flex', gap: 6, alignItems: 'center' }}><Check size={13} color="#00A058" /> Token conectado</div>}
-              <button className="btn btn-primary btn-block btn-lg" onClick={() => void raspar()} disabled={!tokenSaved}><DownloadCloud size={18} /> Raspar leads agora</button>
+              <div className="field">
+                <label className="field-label">Quantos leads buscar?</label>
+                <div className="seg">{QTDS.map((n) => <button key={n} className={`seg-item ${maxLeads === n ? 'is-on' : ''}`} onClick={() => setMaxLeads(n)}>{n}</button>)}</div>
+                <div className="field-hint">Mais leads = mais tempo e mais créditos do Apify.</div>
+              </div>
+              <button className="btn btn-primary btn-block btn-lg" onClick={() => void raspar()} disabled={!tokenSaved}><DownloadCloud size={18} /> Raspar {maxLeads} leads</button>
               <button className="btn btn-ghost btn-sm" onClick={novaRegiao}><Plus size={15} /> Nova região</button>
             </>
           )}

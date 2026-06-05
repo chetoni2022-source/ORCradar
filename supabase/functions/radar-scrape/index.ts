@@ -41,6 +41,18 @@ function circlePolygon(lat: number, lng: number, radiusKm: number, points = 32) 
   return { type: 'Polygon', coordinates: [coords] };
 }
 
+// Score de potencial (0–100). MESMA fórmula de src/lib/score.ts.
+function calcScore(num: number, nota: number, temTel: boolean, temSite: boolean, temFotos: boolean): { score: number; cor: string } {
+  let p = 0;
+  if (num >= 200) p += 40; else if (num >= 80) p += 32; else if (num >= 30) p += 24; else if (num >= 10) p += 14; else if (num >= 3) p += 6;
+  if (nota >= 4.6) p += 30; else if (nota >= 4.2) p += 24; else if (nota >= 3.8) p += 16; else if (nota >= 3.0) p += 8; else if (nota > 0) p += 2;
+  if (temTel) p += 20;
+  if (temSite) p += 5;
+  if (temFotos) p += 5;
+  const cor = p >= 70 ? 'verde' : p >= 45 ? 'amarelo' : 'vermelho';
+  return { score: p, cor };
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
 
@@ -115,6 +127,11 @@ Deno.serve(async (req) => {
       const dup = telNorm ? (telsExistentes.has(telNorm) || vistos.has(telNorm)) : false;
       if (telNorm) vistos.add(telNorm);
       if (dup) duplicados++;
+      const num = Number(p.reviewsCount ?? 0);
+      const nota = p.totalScore != null ? Number(p.totalScore) : null;
+      const temSite = !!p.website;
+      const temFotos = !!(p.imageUrl || Number(p.imagesCount) > 0);
+      const sc = calcScore(num, nota ?? 0, !!tel, temSite, temFotos);
       return {
         nome_empresa: p.title ?? 'Sem nome',
         segmento,
@@ -123,10 +140,12 @@ Deno.serve(async (req) => {
         endereco: p.address ?? null,
         cidade: p.city ?? null,
         link_maps: p.url ?? null,
-        tem_site: !!p.website,
-        num_avaliacoes: Number(p.reviewsCount ?? 0),
-        nota_media: p.totalScore != null ? Number(p.totalScore) : null,
-        tem_fotos: !!(p.imageUrl || Number(p.imagesCount) > 0),
+        tem_site: temSite,
+        num_avaliacoes: num,
+        nota_media: nota,
+        tem_fotos: temFotos,
+        score: sc.score,
+        score_cor: sc.cor,
         latitude: p.location?.lat ?? null,
         longitude: p.location?.lng ?? null,
         regiao: regiao.nome ?? null,
