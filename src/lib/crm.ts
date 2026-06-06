@@ -61,7 +61,7 @@ export function estimarValorCents(scoreCor: string | null): number {
 }
 
 /** Bloco de infos do lead pro campo Observações do CRM (visível e copiável). */
-function buildObservacoes(lead: LeadMapa, mensagem: string): string {
+function buildObservacoes(lead: LeadMapa, mensagem: string, concorrentes: string[] = []): string {
   const cor = lead.score_cor === 'verde' ? 'quente' : lead.score_cor === 'amarelo' ? 'morno' : 'frio';
   const linhas: string[] = [];
   linhas.push(`Score ${lead.score}/100 (${cor})`);
@@ -72,6 +72,9 @@ function buildObservacoes(lead: LeadMapa, mensagem: string): string {
   if (lead.instagram) linhas.push(`Instagram: ${lead.instagram}`);
   if (lead.link_maps) linhas.push(`Google Maps: ${lead.link_maps}`);
   if (lead.regiao) linhas.push(`Regiao prospectada: ${lead.regiao}`);
+  // Concorrentes próximos = outros estabelecimentos do mesmo segmento/região
+  // que o ORCradar já mapeou. O CRM exibe essa linha numa seção própria.
+  if (concorrentes.length) linhas.push(`Concorrentes proximos: ${concorrentes.join('; ')}`);
   if (lead.horario_funcionamento) {
     linhas.push('');
     linhas.push('Horario de funcionamento:');
@@ -81,6 +84,29 @@ function buildObservacoes(lead: LeadMapa, mensagem: string): string {
   linhas.push('Mensagem de 1o contato (Kaua):');
   linhas.push(mensagem);
   return linhas.join('\n');
+}
+
+/**
+ * Concorrentes próximos: outros estabelecimentos que o ORCradar já mapeou na
+ * MESMA região e segmento (mesmo lote), ordenados pelos melhores (score desc).
+ * Retorna nomes formatados ("Nome (4.8★ · 120 av)") prontos pro CRM exibir.
+ */
+async function buscarConcorrentes(lead: LeadMapa): Promise<string[]> {
+  if (!supabase || !lead.regiao) return [];
+  const base = supabase
+    .from('crm_leads')
+    .select('nome_empresa, nota_media, num_avaliacoes')
+    .eq('regiao', lead.regiao)
+    .neq('id', lead.id);
+  const filtered = lead.segmento ? base.eq('segmento', lead.segmento) : base;
+  const { data, error } = await filtered.order('score', { ascending: false }).limit(6);
+  if (error || !data) return [];
+  return data.map((v) => {
+    const nome = String(v.nome_empresa ?? 'Sem nome').trim();
+    if (v.nota_media == null) return nome;
+    const av = v.num_avaliacoes ? ` · ${v.num_avaliacoes} av` : '';
+    return `${nome} (${v.nota_media}★${av})`;
+  });
 }
 
 export type EnvioCrm = { mensagem: string; tom: string; valorCents: number };
@@ -94,6 +120,11 @@ export type EnvioCrm = { mensagem: string; tom: string; valorCents: number };
 export async function enviarParaCrm(lead: LeadMapa, opts: EnvioCrm): Promise<void> {
   if (!supabase) throw new Error('Supabase não configurado.');
   const nowIso = new Date().toISOString();
+
+  // Concorrentes próximos = outros leads que o ORCradar mapeou na MESMA região e
+  // segmento (mesmo lote de raspagem), os melhores por score. Vão pras observações.
+  const concorrentes = await buscarConcorrentes(lead);
+
   const { error } = await supabase
     .from('crm_leads')
     .update({
@@ -107,7 +138,7 @@ export async function enviarParaCrm(lead: LeadMapa, opts: EnvioCrm): Promise<voi
       tom_mensagem: opts.tom,
       // Observações leva TODAS as infos (site, insta, maps, score, mensagem) —
       // o CRM da ORCtech mostra esse campo no detalhe do lead.
-      observacoes: buildObservacoes(lead, opts.mensagem),
+      observacoes: buildObservacoes(lead, opts.mensagem, concorrentes),
       proximo_passo: 'Mandar 1o contato no WhatsApp',
       ultimo_contato_at: nowIso,
     })
