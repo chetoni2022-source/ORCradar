@@ -76,6 +76,8 @@ export function MapWorkspace({ regions, reloadRegions, activeRegionId, setActive
   const [leads, setLeads] = useState<LeadMapa[]>([]);
   const leadsRef = useRef(leads); leadsRef.current = leads;
   const [selectedLead, setSelectedLead] = useState<LeadMapa | null>(null);
+  // IDs dos leads encontrados na ÚLTIMA raspagem (pra destacar "raspados agora").
+  const [novosIds, setNovosIds] = useState<Set<string>>(new Set());
 
   const [q, setQ] = useState('');
   const [results, setResults] = useState<GeocodeResult[]>([]);
@@ -103,8 +105,8 @@ export function MapWorkspace({ regions, reloadRegions, activeRegionId, setActive
 
   // Roda só quando a região ATIVA muda (não a cada reload da lista).
   useEffect(() => {
-    if (!activeRegionId) { setGuideMode('draw'); setScrape(null); setLeads([]); return; }
-    setGuideMode('ready'); setScrape(null);
+    if (!activeRegionId) { setGuideMode('draw'); setScrape(null); setLeads([]); setNovosIds(new Set()); return; }
+    setGuideMode('ready'); setScrape(null); setNovosIds(new Set());
     const r = regionsRef.current.find((x) => x.id === activeRegionId);
     if (!r) return;
     setSegmento(r.segmento ?? 'Oficina mecânica');
@@ -123,7 +125,7 @@ export function MapWorkspace({ regions, reloadRegions, activeRegionId, setActive
     if (q.trim().length < 3) { setResults([]); return; }
     const t = window.setTimeout(async () => {
       setSearching(true);
-      try { setResults(await buscarEndereco(q)); } catch { setResults([]); } finally { setSearching(false); }
+      try { setResults(await buscarEndereco(q, { lat: effectiveCenter[1], lng: effectiveCenter[0] })); } catch { setResults([]); } finally { setSearching(false); }
     }, 450);
     return () => window.clearTimeout(t);
   }, [q]);
@@ -138,9 +140,9 @@ export function MapWorkspace({ regions, reloadRegions, activeRegionId, setActive
   const leadsGeo = useMemo(() => ({
     type: 'FeatureCollection' as const,
     features: leads.filter((l) => l.latitude != null && l.longitude != null).map((l) => ({
-      type: 'Feature' as const, geometry: { type: 'Point' as const, coordinates: [l.longitude as number, l.latitude as number] }, properties: { id: l.id, score_cor: l.score_cor },
+      type: 'Feature' as const, geometry: { type: 'Point' as const, coordinates: [l.longitude as number, l.latitude as number] }, properties: { id: l.id, score_cor: l.score_cor, novo: novosIds.has(l.id) },
     })),
-  }), [leads]);
+  }), [leads, novosIds]);
 
   const routeGeo = useMemo(() => rota ? ({ type: 'Feature' as const, geometry: { type: 'LineString' as const, coordinates: rota.coords.map(([la, ln]) => [ln, la]) }, properties: {} }) : null, [rota]);
 
@@ -173,6 +175,7 @@ export function MapWorkspace({ regions, reloadRegions, activeRegionId, setActive
   async function raspar() {
     if (!activeRegion) return;
     const nomeRegiao = activeRegion.nome || 'região';
+    const antes = new Set(leadsRef.current.map((l) => l.id)); // o que já existia antes da raspagem
     pedirPermissaoNotificacao();
     setScrape({ status: 'running' }); setLogIdx(0);
     startFaviconRadar(); // radar girando no favicon enquanto raspa
@@ -183,6 +186,7 @@ export function MapWorkspace({ regions, reloadRegions, activeRegionId, setActive
       reloadRegions();
       const fresh = await listLeadsByArea(Number(activeRegion.centro_lat), Number(activeRegion.centro_lng), Number(activeRegion.raio_km));
       setLeads(fresh);
+      setNovosIds(new Set(fresh.filter((l) => !antes.has(l.id)).map((l) => l.id))); // destaca os raspados agora
       setCollapsed(true); // mostra o mapa (senão o painel cobre os pontos)
       fitToLeads(fresh);
       notificar('Raspagem concluída ✓', `${result.inseridos} leads novos em ${nomeRegiao}.`);
@@ -221,11 +225,11 @@ export function MapWorkspace({ regions, reloadRegions, activeRegionId, setActive
     e.preventDefault();
     if (q.trim().length < 3) return;
     setSearching(true);
-    try { setResults(await buscarEndereco(q)); } catch { setResults([]); } finally { setSearching(false); }
+    try { setResults(await buscarEndereco(q, { lat: effectiveCenter[1], lng: effectiveCenter[0] })); } catch { setResults([]); } finally { setSearching(false); }
   }
   function irPara(r: GeocodeResult) {
     setPinned([r.lng, r.lat]); setGuideMode('draw'); setActiveRegionId(null);
-    mapRef.current?.flyTo({ center: [r.lng, r.lat], zoom: 14, duration: 900 });
+    mapRef.current?.flyTo({ center: [r.lng, r.lat], zoom: 16, duration: 900 });
     setResults([]); skipSearch.current = true; setQ(r.label.split(',').slice(0, 2).join(',').trim());
   }
 
@@ -261,6 +265,12 @@ export function MapWorkspace({ regions, reloadRegions, activeRegionId, setActive
         )}
 
         <Source id="leads" type="geojson" data={leadsGeo}>
+          {/* anel azul nos "raspados agora" (última raspagem) */}
+          <Layer id="leads-novo" type="circle" filter={['==', ['get', 'novo'], true]} paint={{
+            'circle-radius': ['interpolate', ['linear'], ['zoom'], 9, 13, 16, 21],
+            'circle-color': '#2563EB', 'circle-opacity': 0.18,
+            'circle-stroke-width': 2.5, 'circle-stroke-color': '#2563EB',
+          }} />
           {/* halo branco por baixo (dá contraste em qualquer mapa) */}
           <Layer id="leads-halo" type="circle" paint={{
             'circle-radius': ['interpolate', ['linear'], ['zoom'], 9, 9, 16, 16],
@@ -300,6 +310,16 @@ export function MapWorkspace({ regions, reloadRegions, activeRegionId, setActive
 
       {/* Mira central (modo desenhar) */}
       {showMira && <div className="map-crosshair"><Crosshair size={30} strokeWidth={1.75} /></div>}
+
+      {/* Legenda dos leads no mapa */}
+      {leads.length > 0 && (
+        <div className="map-legend glass">
+          {novosIds.size > 0 && <span className="map-legend-item"><span className="ml-ring" /> Raspados agora ({novosIds.size})</span>}
+          <span className="map-legend-item"><span className="ml-dot" style={{ background: '#00C46A' }} /> Quente</span>
+          <span className="map-legend-item"><span className="ml-dot" style={{ background: '#F59E0B' }} /> Morno</span>
+          <span className="map-legend-item"><span className="ml-dot" style={{ background: '#EF4444' }} /> Frio</span>
+        </div>
+      )}
 
       {/* Aviso: localização imprecisa (desktop sem GPS) */}
       {locImprecisa && minhaLoc && (

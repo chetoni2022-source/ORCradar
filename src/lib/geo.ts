@@ -37,14 +37,28 @@ export function getMinhaLocalizacao(): Promise<MinhaLoc> {
 
 export type GeocodeResult = { label: string; lat: number; lng: number };
 
-/** Busca um endereço/lugar pelo nome (Nominatim). */
-export async function buscarEndereco(q: string): Promise<GeocodeResult[]> {
+/**
+ * Busca um endereço/lugar pelo nome (Nominatim).
+ * Mais preciso: restringe ao Brasil (countrycodes=br) e, quando o mapa já está
+ * num lugar, ENVIESA os resultados pra perto desse ponto (viewbox) — assim a
+ * busca "bate" com o que você está olhando, em vez de cair em outra cidade.
+ */
+export async function buscarEndereco(q: string, perto?: LatLng): Promise<GeocodeResult[]> {
   const termo = q.trim();
   if (termo.length < 3) return [];
-  const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=6&accept-language=pt-BR&q=${encodeURIComponent(termo)}`;
+  const params = new URLSearchParams({
+    format: 'jsonv2', limit: '7', 'accept-language': 'pt-BR',
+    countrycodes: 'br', addressdetails: '1', dedupe: '1', q: termo,
+  });
+  if (perto && Number.isFinite(perto.lat) && Number.isFinite(perto.lng)) {
+    const d = 0.7; // ~70 km de viés ao redor do que está na tela
+    params.set('viewbox', `${perto.lng - d},${perto.lat - d},${perto.lng + d},${perto.lat + d}`);
+    params.set('bounded', '0'); // prefere dentro da caixa, mas não descarta o resto
+  }
+  const url = `https://nominatim.openstreetmap.org/search?${params.toString()}`;
   const res = await fetch(url, { headers: { Accept: 'application/json' } });
   if (!res.ok) throw new Error('Falha na busca de endereço.');
-  const data = (await res.json()) as Array<{ display_name: string; lat: string; lon: string }>;
+  const data = (await res.json()) as Array<{ display_name: string; lat: string; lon: string; importance?: number }>;
   return data.map((d) => ({ label: d.display_name, lat: Number(d.lat), lng: Number(d.lon) }));
 }
 
