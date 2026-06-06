@@ -96,7 +96,11 @@ export default function App() {
   useEffect(() => { if (owner) void reloadRegions(); }, [owner, reloadRegions]);
 
   function openLead(lead: LeadMapa) {
-    if (lead.regiao) { const r = regions.find((x) => x.nome === lead.regiao); if (r) setActiveRegionId(r.id); }
+    if (lead.regiao) {
+      const alvo = lead.regiao.trim().toLowerCase();
+      const r = regions.find((x) => (x.nome ?? '').trim().toLowerCase() === alvo);
+      if (r) setActiveRegionId(r.id);
+    }
     if (lead.latitude != null && lead.longitude != null) setFocusLatLng({ lat: lead.latitude, lng: lead.longitude });
     setView('mapa');
   }

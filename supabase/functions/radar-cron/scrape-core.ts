@@ -72,6 +72,18 @@ function acharInstagram(p: Record<string, any>): string | null {
   return null;
 }
 
+/** Formata o horário de funcionamento (dias + abre/fecha) que vem do Google. */
+function formatHorario(oh: unknown): string | null {
+  if (!Array.isArray(oh) || oh.length === 0) return null;
+  const linhas = oh.map((d: Record<string, unknown>) => {
+    const dia = (d?.day ?? d?.dia ?? '') as string;
+    const horas = (d?.hours ?? d?.horas ?? '') as string;
+    if (dia && horas) return `${dia}: ${horas}`;
+    return String(dia || horas || '').trim();
+  }).filter(Boolean);
+  return linhas.length ? linhas.join('\n') : null;
+}
+
 /** Normaliza texto pra dedup (sem acento, sem pontuação, minúsculo). */
 function norm(s: string | null | undefined): string {
   return String(s ?? '').normalize('NFD').replace(/\p{M}/gu, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
@@ -174,6 +186,7 @@ export async function scrapeRegiao(
         nome_empresa: nome, segmento: segmentoKey, telefone: tel, whatsapp: tel,
         instagram, site_url: siteUrl, place_id: placeId ? String(placeId) : null,
         endereco, cidade: p.city ?? null, link_maps: p.url ?? null,
+        horario_funcionamento: formatHorario(p.openingHours),
         tem_site: temSite, num_avaliacoes: num, nota_media: nota, tem_fotos: temFotos,
         score: sc.score, score_cor: sc.cor,
         latitude: p.location?.lat ?? null, longitude: p.location?.lng ?? null,

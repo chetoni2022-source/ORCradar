@@ -260,10 +260,15 @@ export function MapWorkspace({ regions, reloadRegions, activeRegionId, setActive
         )}
 
         <Source id="leads" type="geojson" data={leadsGeo}>
+          {/* halo branco por baixo (dá contraste em qualquer mapa) */}
+          <Layer id="leads-halo" type="circle" paint={{
+            'circle-radius': ['interpolate', ['linear'], ['zoom'], 9, 9, 16, 16],
+            'circle-color': '#ffffff', 'circle-opacity': 0.9,
+          }} />
           <Layer id="leads-pts" type="circle" paint={{
-            'circle-radius': ['interpolate', ['linear'], ['zoom'], 9, 4, 16, 8],
+            'circle-radius': ['interpolate', ['linear'], ['zoom'], 9, 6, 16, 12],
             'circle-color': ['match', ['get', 'score_cor'], 'verde', '#00C46A', 'amarelo', '#F59E0B', 'vermelho', '#EF4444', '#94A3B8'],
-            'circle-stroke-width': 1.5, 'circle-stroke-color': '#ffffff', 'circle-opacity': 0.95,
+            'circle-stroke-width': 2, 'circle-stroke-color': '#ffffff', 'circle-opacity': 1,
           }} />
         </Source>
 
@@ -341,7 +346,7 @@ export function MapWorkspace({ regions, reloadRegions, activeRegionId, setActive
                 <div className="t-h3" style={{ fontSize: 16 }}>leads novos salvos</div>
                 <div className="t-caption t-muted">{scrape.result!.total} lugares encontrados · {scrape.result!.duplicados} já existiam.</div>
                 <div className="row" style={{ gap: 8, marginTop: 4 }}>
-                  <button className="btn btn-secondary btn-sm" onClick={() => fitToLeads(leads)}><Eye size={15} /> Ver no mapa</button>
+                  <button className="btn btn-secondary btn-sm" onClick={() => { setCollapsed(true); fitToLeads(leads); }}><Eye size={15} /> Ver no mapa</button>
                   <button className="btn btn-primary btn-sm" onClick={onGoLeads}>Revisar leads <ArrowRight size={15} /></button>
                 </div>
               </div>

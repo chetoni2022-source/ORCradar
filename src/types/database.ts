@@ -33,6 +33,7 @@ export interface CrmLead {
   endereco: string | null;
   cidade: string | null;
   link_maps: string | null;
+  horario_funcionamento: string | null;
   tem_site: boolean;
   num_avaliacoes: number;
   nota_media: number | null;

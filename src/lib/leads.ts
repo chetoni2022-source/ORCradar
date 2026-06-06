@@ -14,6 +14,7 @@ export type LeadMapa = {
   endereco: string | null;
   cidade: string | null;
   link_maps: string | null;
+  horario_funcionamento: string | null;
   tem_site: boolean;
   tem_fotos: boolean;
   num_avaliacoes: number;
@@ -33,7 +34,7 @@ export type LeadMapa = {
 };
 
 const COLS =
-  'id,nome_empresa,segmento,regiao,telefone,whatsapp,instagram,site_url,endereco,cidade,link_maps,tem_site,tem_fotos,num_avaliacoes,nota_media,score,score_cor,latitude,longitude,aprovado,duplicado,enviado_crm,etapa,mensagem_whatsapp,tom_mensagem,valor_potencial_mensal_cents,created_at';
+  'id,nome_empresa,segmento,regiao,telefone,whatsapp,instagram,site_url,endereco,cidade,link_maps,horario_funcionamento,tem_site,tem_fotos,num_avaliacoes,nota_media,score,score_cor,latitude,longitude,aprovado,duplicado,enviado_crm,etapa,mensagem_whatsapp,tom_mensagem,valor_potencial_mensal_cents,created_at';
 
 /** Leads de uma região específica (só os que têm coordenadas — pro mapa). */
 export async function listLeadsByRegiao(nome: string | null): Promise<LeadMapa[]> {

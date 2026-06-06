@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import {
   X, Star, Phone, Globe, AtSign, MapPin, Check, Trash2, RotateCcw,
-  MessageCircle, Send, Loader2, Eye, Navigation, Building2, TrendingUp, CheckCircle2,
+  MessageCircle, Send, Loader2, Eye, Navigation, Building2, TrendingUp, CheckCircle2, Clock, CalendarClock,
 } from 'lucide-react';
 import { ScoreBadge } from './ScoreBadge';
 import { TONS, gerarMensagem, whatsappLink, type Tom } from '../lib/mensagem';
@@ -27,6 +27,13 @@ function fmtBRL(cents: number) {
 
 function fmtDist(km: number) {
   return km < 1 ? `${Math.round(km * 1000)} m` : `${km.toFixed(1)} km`;
+}
+
+function fmtDataHora(iso: string | null): string | null {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
 export function LeadDetailModal({ lead, onClose, onChanged, onOpenMapa }: Props) {
@@ -117,6 +124,15 @@ export function LeadDetailModal({ lead, onClose, onChanged, onOpenMapa }: Props)
           )}
           {local.telefone && <div className="row" style={{ gap: 6 }}><Phone size={14} /> <span className="tnum">{local.telefone}</span></div>}
           {local.endereco && <div className="row" style={{ gap: 6, alignItems: 'flex-start' }}><MapPin size={14} style={{ marginTop: 2, flexShrink: 0 }} /> <span className="t-muted">{local.endereco}</span></div>}
+          {local.horario_funcionamento && (
+            <div className="row" style={{ gap: 6, alignItems: 'flex-start' }}>
+              <Clock size={14} style={{ marginTop: 2, flexShrink: 0 }} />
+              <span className="t-muted" style={{ whiteSpace: 'pre-line', fontSize: 12.5, lineHeight: 1.5 }}>{local.horario_funcionamento}</span>
+            </div>
+          )}
+          {fmtDataHora(local.created_at) && (
+            <div className="row t-faint" style={{ gap: 6, fontSize: 12 }}><CalendarClock size={13} /> Raspado em {fmtDataHora(local.created_at)}</div>
+          )}
           <div className="row-wrap" style={{ gap: 6 }}>
             {local.segmento && <span className="badge badge-neutral">{local.segmento}</span>}
             {local.regiao && <span className="badge badge-outline">{local.regiao}</span>}

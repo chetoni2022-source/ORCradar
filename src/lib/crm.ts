@@ -72,6 +72,11 @@ function buildObservacoes(lead: LeadMapa, mensagem: string): string {
   if (lead.instagram) linhas.push(`Instagram: ${lead.instagram}`);
   if (lead.link_maps) linhas.push(`Google Maps: ${lead.link_maps}`);
   if (lead.regiao) linhas.push(`Regiao prospectada: ${lead.regiao}`);
+  if (lead.horario_funcionamento) {
+    linhas.push('');
+    linhas.push('Horario de funcionamento:');
+    linhas.push(lead.horario_funcionamento);
+  }
   linhas.push('');
   linhas.push('Mensagem de 1o contato (Kaua):');
   linhas.push(mensagem);

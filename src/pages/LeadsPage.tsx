@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Loader2, AlertCircle, Target, Star, Phone, Globe, MapPin, AtSign, Check, CheckCheck, Send, X, Download } from 'lucide-react';
+import { Loader2, AlertCircle, Target, Star, Phone, Globe, MapPin, AtSign, Check, CheckCheck, Send, X, Download, Search, CalendarClock } from 'lucide-react';
 import { listAllLeads, linkSeguro, type LeadMapa } from '../lib/leads';
 import { enviarLoteParaCrm } from '../lib/crm';
 import { leadsParaCsv, baixarCsv } from '../lib/csv';
@@ -28,6 +28,13 @@ function statusBadge(l: LeadMapa) {
 /** Pode ser enviado pro CRM (ainda não foi e não está descartado). */
 const enviavel = (l: LeadMapa) => !l.enviado_crm && l.etapa !== 'perdido';
 
+function fmtRaspado(iso: string | null): string | null {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' });
+}
+
 type Props = { onReview: (lead: LeadMapa) => void; leadsVersion: number };
 
 export function LeadsPage({ onReview, leadsVersion }: Props) {
@@ -37,6 +44,7 @@ export function LeadsPage({ onReview, leadsVersion }: Props) {
   const [cor, setCor] = useState('todos');
   const [reg, setReg] = useState('todas');
   const [stat, setStat] = useState('todos');
+  const [busca, setBusca] = useState('');
 
   const [selMode, setSelMode] = useState(false);
   const [sel, setSel] = useState<Set<string>>(new Set());
@@ -56,10 +64,13 @@ export function LeadsPage({ onReview, leadsVersion }: Props) {
     () => leads.map((l) => ({ l, sc: calcularScore(l) })).sort((a, b) => b.sc.score - a.sc.score),
     [leads],
   );
-  const filtered = useMemo(
-    () => enriched.filter(({ l, sc }) => (cor === 'todos' || sc.cor === cor) && (reg === 'todas' || l.regiao === reg) && statusMatch(l, stat)),
-    [enriched, cor, reg, stat],
-  );
+  const filtered = useMemo(() => {
+    const q = busca.trim().toLowerCase();
+    const bate = (l: LeadMapa) => !q || [l.nome_empresa, l.telefone, l.whatsapp, l.endereco, l.segmento, l.regiao, l.cidade]
+      .some((v) => (v ?? '').toLowerCase().includes(q));
+    return enriched.filter(({ l, sc }) =>
+      (cor === 'todos' || sc.cor === cor) && (reg === 'todas' || l.regiao === reg) && statusMatch(l, stat) && bate(l));
+  }, [enriched, cor, reg, stat, busca]);
   const contagem = useMemo(() => {
     const c = { verde: 0, amarelo: 0, vermelho: 0 } as Record<string, number>;
     for (const { sc } of enriched) c[sc.cor]++;
@@ -121,6 +132,11 @@ export function LeadsPage({ onReview, leadsVersion }: Props) {
       </div>
 
       <div className="col" style={{ gap: 10, marginBottom: 18 }}>
+        <div className="input-icon-wrap">
+          <span className="input-icon"><Search size={16} /></span>
+          <input className="input" value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar por nome, telefone, endereço, segmento…" />
+          {busca && <button className="btn btn-ghost btn-sm" style={{ position: 'absolute', right: 6, top: '50%', transform: 'translateY(-50%)', width: 28, height: 28, padding: 0 }} onClick={() => setBusca('')}><X size={14} /></button>}
+        </div>
         <div className="row" style={{ gap: 12, flexWrap: 'wrap' }}>
           <div className="seg" style={{ width: 'auto' }}>
             {FILTROS.map((f) => (
@@ -180,6 +196,9 @@ export function LeadsPage({ onReview, leadsVersion }: Props) {
                   {l.segmento && <span className="badge badge-neutral">{l.segmento}</span>}
                   {l.regiao && <span className="badge badge-outline"><MapPin size={11} /> {l.regiao}</span>}
                 </div>
+                {fmtRaspado(l.created_at) && (
+                  <div className="row t-faint" style={{ gap: 5, fontSize: 11.5 }}><CalendarClock size={12} /> Raspado em {fmtRaspado(l.created_at)}</div>
+                )}
                 <div className="lead-card-foot">
                   <div className="row" style={{ gap: 10 }} onClick={(e) => e.stopPropagation()}>
                     {linkSeguro(l.link_maps) && <a className="lead-card-maps" href={linkSeguro(l.link_maps)} target="_blank" rel="noreferrer" title="Google Maps"><MapPin size={14} /></a>}
