@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Loader2, AlertCircle, Target, Star, Phone, Globe, MapPin, AtSign, Check, CheckCheck, Send, X, Download, Search, CalendarClock } from 'lucide-react';
+import { Loader2, AlertCircle, Target, Star, Phone, Globe, MapPin, AtSign, Check, CheckCheck, Send, X, Download, Search, CalendarClock, Trash2 } from 'lucide-react';
 import { listAllLeads, linkSeguro, type LeadMapa } from '../lib/leads';
-import { enviarLoteParaCrm } from '../lib/crm';
+import { enviarLoteParaCrm, excluirLeads } from '../lib/crm';
 import { leadsParaCsv, baixarCsv } from '../lib/csv';
 import { ScoreBadge } from '../components/ScoreBadge';
 import { calcularScore } from '../lib/score';
@@ -45,6 +45,7 @@ export function LeadsPage({ onReview, leadsVersion }: Props) {
   const [reg, setReg] = useState('todas');
   const [stat, setStat] = useState('todos');
   const [busca, setBusca] = useState('');
+  const [ordem, setOrdem] = useState<'score' | 'recentes' | 'antigos'>('score');
 
   const [selMode, setSelMode] = useState(false);
   const [sel, setSel] = useState<Set<string>>(new Set());
@@ -68,16 +69,24 @@ export function LeadsPage({ onReview, leadsVersion }: Props) {
     const q = busca.trim().toLowerCase();
     const bate = (l: LeadMapa) => !q || [l.nome_empresa, l.telefone, l.whatsapp, l.endereco, l.segmento, l.regiao, l.cidade]
       .some((v) => (v ?? '').toLowerCase().includes(q));
-    return enriched.filter(({ l, sc }) =>
+    const arr = enriched.filter(({ l, sc }) =>
       (cor === 'todos' || sc.cor === cor) && (reg === 'todas' || l.regiao === reg) && statusMatch(l, stat) && bate(l));
-  }, [enriched, cor, reg, stat, busca]);
+    if (ordem === 'recentes' || ordem === 'antigos') {
+      const dir = ordem === 'recentes' ? -1 : 1;
+      const t = (s: string | null) => (s ? new Date(s).getTime() || 0 : 0);
+      arr.sort((a, b) => (t(a.l.created_at) - t(b.l.created_at)) * dir);
+    }
+    return arr;
+  }, [enriched, cor, reg, stat, busca, ordem]);
   const contagem = useMemo(() => {
     const c = { verde: 0, amarelo: 0, vermelho: 0 } as Record<string, number>;
     for (const { sc } of enriched) c[sc.cor]++;
     return c;
   }, [enriched]);
 
-  const selecionaveis = useMemo(() => filtered.filter(({ l }) => enviavel(l)).map(({ l }) => l), [filtered]);
+  // No modo seleção dá pra marcar QUALQUER lead (envio ignora os que não dá; excluir aceita todos).
+  const selecionaveis = useMemo(() => filtered.map(({ l }) => l), [filtered]);
+  const selEnviaveis = useMemo(() => leads.filter((l) => sel.has(l.id) && enviavel(l)).length, [leads, sel]);
 
   function toggleSel(id: string) {
     setSel((prev) => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
@@ -88,7 +97,7 @@ export function LeadsPage({ onReview, leadsVersion }: Props) {
 
   async function enviarSelecionados() {
     const alvo = leads.filter((l) => sel.has(l.id) && enviavel(l));
-    if (alvo.length === 0) return;
+    if (alvo.length === 0) { alert('Nenhum dos selecionados pode ir pro CRM (já enviados ou descartados).'); return; }
     if (!window.confirm(`Enviar ${alvo.length} ${alvo.length === 1 ? 'lead' : 'leads'} pro CRM da ORCtech com todas as informações?`)) return;
     setBulkBusy(true);
     try {
@@ -100,8 +109,21 @@ export function LeadsPage({ onReview, leadsVersion }: Props) {
     finally { setBulkBusy(false); }
   }
 
+  async function excluirSelecionados() {
+    const ids = [...sel];
+    if (ids.length === 0) return;
+    if (!window.confirm(`Excluir ${ids.length} ${ids.length === 1 ? 'lead' : 'leads'} PERMANENTEMENTE? Não dá pra desfazer.`)) return;
+    setBulkBusy(true);
+    try {
+      await excluirLeads(ids);
+      await load();
+      sairSelecao();
+    } catch (e) { alert(e instanceof Error ? e.message : 'Falha ao excluir.'); }
+    finally { setBulkBusy(false); }
+  }
+
   function clickCard(l: LeadMapa) {
-    if (selMode) { if (enviavel(l)) toggleSel(l.id); }
+    if (selMode) toggleSel(l.id);
     else onReview(l);
   }
 
@@ -126,7 +148,7 @@ export function LeadsPage({ onReview, leadsVersion }: Props) {
             <Download size={15} /> CSV
           </button>
           <button className={`btn btn-sm ${selMode ? 'btn-primary' : 'btn-secondary'}`} onClick={() => (selMode ? sairSelecao() : setSelMode(true))}>
-            <CheckCheck size={15} /> {selMode ? 'Sair da seleção' : 'Selecionar pro CRM'}
+            <CheckCheck size={15} /> {selMode ? 'Sair da seleção' : 'Selecionar'}
           </button>
         </div>
       </div>
@@ -148,6 +170,11 @@ export function LeadsPage({ onReview, leadsVersion }: Props) {
           <select className="select" style={{ width: 'auto', minWidth: 170 }} value={reg} onChange={(e) => setReg(e.target.value)}>
             <option value="todas">Todas as regiões</option>
             {regioes.map((r) => <option key={r} value={r}>{r}</option>)}
+          </select>
+          <select className="select" style={{ width: 'auto', minWidth: 150 }} value={ordem} onChange={(e) => setOrdem(e.target.value as typeof ordem)} title="Ordenar">
+            <option value="score">Melhor score</option>
+            <option value="recentes">Mais recentes</option>
+            <option value="antigos">Mais antigos</option>
           </select>
           <span className="t-caption t-muted" style={{ marginLeft: 'auto', alignSelf: 'center' }}>{filtered.length} de {leads.length}</span>
         </div>
@@ -172,11 +199,10 @@ export function LeadsPage({ onReview, leadsVersion }: Props) {
         <div className="leads-grid">
           {filtered.map(({ l, sc }) => {
             const checked = sel.has(l.id);
-            const podeSel = enviavel(l);
             return (
-              <div key={l.id} className={`lead-card s-${sc.cor} ${selMode && podeSel ? 'is-selmode' : ''}`} role="button" tabIndex={0}
+              <div key={l.id} className={`lead-card s-${sc.cor} ${selMode ? 'is-selmode' : ''}`} role="button" tabIndex={0}
                 onClick={() => clickCard(l)} onKeyDown={(e) => { if (e.key === 'Enter') clickCard(l); }}>
-                {selMode && podeSel && (
+                {selMode && (
                   <span className={`lead-check ${checked ? 'is-on' : ''}`} onClick={(e) => { e.stopPropagation(); toggleSel(l.id); }}>
                     {checked && <Check size={14} strokeWidth={3} />}
                   </span>
@@ -205,7 +231,7 @@ export function LeadsPage({ onReview, leadsVersion }: Props) {
                     {linkSeguro(l.instagram) && <a className="lead-card-maps" href={linkSeguro(l.instagram)} target="_blank" rel="noreferrer" title="Instagram" style={{ color: '#C13584' }}><AtSign size={14} /></a>}
                     {linkSeguro(l.site_url) && <a className="lead-card-maps" href={linkSeguro(l.site_url)} target="_blank" rel="noreferrer" title="Site"><Globe size={14} /></a>}
                   </div>
-                  <span className="lead-card-open">{selMode ? (podeSel ? (checked ? 'Selecionado' : 'Selecionar') : 'já no CRM') : 'Revisar →'}</span>
+                  <span className="lead-card-open">{selMode ? (checked ? 'Selecionado' : 'Selecionar') : 'Revisar →'}</span>
                 </div>
               </div>
             );
@@ -219,8 +245,11 @@ export function LeadsPage({ onReview, leadsVersion }: Props) {
           <button className="btn btn-ghost btn-sm" onClick={selecionarTodos} disabled={selecionaveis.length === 0}>Selecionar todos ({selecionaveis.length})</button>
           {sel.size > 0 && <button className="btn btn-ghost btn-sm" onClick={limparSel}><X size={14} /> Limpar</button>}
           <span className="grow" />
-          <button className="btn btn-primary" onClick={() => void enviarSelecionados()} disabled={sel.size === 0 || bulkBusy}>
-            {bulkBusy ? <Loader2 size={16} className="spin" /> : <Send size={16} />} Enviar {sel.size > 0 ? sel.size : ''} pro CRM
+          <button className="btn btn-secondary btn-sm" onClick={() => void excluirSelecionados()} disabled={sel.size === 0 || bulkBusy} style={{ color: 'var(--error)' }}>
+            {bulkBusy ? <Loader2 size={15} className="spin" /> : <Trash2 size={15} />} Excluir{sel.size > 0 ? ` (${sel.size})` : ''}
+          </button>
+          <button className="btn btn-primary" onClick={() => void enviarSelecionados()} disabled={selEnviaveis === 0 || bulkBusy}>
+            {bulkBusy ? <Loader2 size={16} className="spin" /> : <Send size={16} />} Enviar {selEnviaveis > 0 ? selEnviaveis : ''} pro CRM
           </button>
         </div>
       )}

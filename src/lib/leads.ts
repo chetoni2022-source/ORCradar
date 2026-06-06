@@ -51,6 +51,29 @@ export async function listLeadsByRegiao(nome: string | null): Promise<LeadMapa[]
   return (data ?? []) as LeadMapa[];
 }
 
+/**
+ * Leads do ORCradar dentro de uma ÁREA (caixa do raio) — usado no mapa.
+ * Robusto: NÃO depende do nome da região (que pode estar vazio ou não bater com
+ * o `regiao` salvo nos leads). Pega tudo que tem coordenada dentro do raio.
+ */
+export async function listLeadsByArea(lat: number, lng: number, raioKm: number): Promise<LeadMapa[]> {
+  if (!supabase) return [];
+  const margem = Math.max(raioKm, 1) * 1.3; // um pouco além do raio, por garantia
+  const dLat = margem / 111.32;
+  const dLng = margem / (111.32 * Math.cos((lat * Math.PI) / 180) || 111.32);
+  const { data, error } = await supabase
+    .from('crm_leads')
+    .select(COLS)
+    .eq('origem', 'orcradar')
+    .not('latitude', 'is', null)
+    .gte('latitude', lat - dLat).lte('latitude', lat + dLat)
+    .gte('longitude', lng - dLng).lte('longitude', lng + dLng)
+    .order('score', { ascending: false })
+    .limit(800);
+  if (error) throw new Error(error.message);
+  return (data ?? []) as LeadMapa[];
+}
+
 /** Todos os leads do ORCradar (pra tela Leads / triagem). */
 export async function listAllLeads(): Promise<LeadMapa[]> {
   if (!supabase) return [];

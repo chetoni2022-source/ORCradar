@@ -174,3 +174,19 @@ export async function enviarLoteParaCrm(leads: LeadMapa[]): Promise<ResultadoLot
   const enviados = results.filter((r) => r.status === 'fulfilled').length;
   return { enviados, falhas: results.length - enviados };
 }
+
+/**
+ * Exclui leads em lote — PERMANENTE. Por segurança só apaga leads do ORCradar
+ * (origem='orcradar'), nunca leads próprios do CRM da ORCtech.
+ */
+export async function excluirLeads(ids: string[]): Promise<number> {
+  if (!supabase) throw new Error('Supabase não configurado.');
+  if (!ids.length) return 0;
+  const { error, count } = await supabase
+    .from('crm_leads')
+    .delete({ count: 'exact' })
+    .in('id', ids)
+    .eq('origem', 'orcradar');
+  if (error) throw new Error(error.message);
+  return count ?? ids.length;
+}

@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 import { createRegiao, type NovaRegiao } from '../lib/radarRegioes';
 import { rasparRegiao, getApifyToken, setApifyToken, type ResultadoRaspagem } from '../lib/scrape';
-import { listLeadsByRegiao, type LeadMapa } from '../lib/leads';
+import { listLeadsByArea, type LeadMapa } from '../lib/leads';
 import {
   getMinhaLocalizacao, buscarEndereco, tracarRota, formatarDuracao,
   type ModoRota, type Rota, type GeocodeResult,
@@ -110,7 +110,7 @@ export function MapWorkspace({ regions, reloadRegions, activeRegionId, setActive
     setSegmento(r.segmento ?? 'Oficina mecânica');
     setRaioKm(Number(r.raio_km));
     mapRef.current?.flyTo({ center: [Number(r.centro_lng), Number(r.centro_lat)], zoom: zoomForRaio(Number(r.raio_km)), duration: 900 });
-    void (async () => { try { setLeads(await listLeadsByRegiao(r.nome)); } catch { setLeads([]); } })();
+    void (async () => { try { setLeads(await listLeadsByArea(Number(r.centro_lat), Number(r.centro_lng), Number(r.raio_km))); } catch { setLeads([]); } })();
   }, [activeRegionId]);
 
   useEffect(() => {
@@ -181,8 +181,9 @@ export function MapWorkspace({ regions, reloadRegions, activeRegionId, setActive
       const result = await rasparRegiao(activeRegion.id, maxLeads);
       setScrape({ status: 'done', result });
       reloadRegions();
-      const fresh = await listLeadsByRegiao(activeRegion.nome);
+      const fresh = await listLeadsByArea(Number(activeRegion.centro_lat), Number(activeRegion.centro_lng), Number(activeRegion.raio_km));
       setLeads(fresh);
+      setCollapsed(true); // mostra o mapa (senão o painel cobre os pontos)
       fitToLeads(fresh);
       notificar('Raspagem concluída ✓', `${result.inseridos} leads novos em ${nomeRegiao}.`);
     } catch (e) {
