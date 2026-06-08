@@ -402,9 +402,11 @@ export function MapWorkspace({ regions, reloadRegions, activeRegionId, setActive
                 <div className="grow mono-code" style={{ fontSize: 11.5 }}>{effectiveCenter[1].toFixed(5)}, {effectiveCenter[0].toFixed(5)}</div>
                 {pinned ? <button className="btn btn-ghost btn-sm" style={{ width: 28, padding: 0 }} onClick={() => setPinned(null)} title="Soltar"><RotateCcw size={13} /></button> : <span className="t-caption t-faint">meio do mapa</span>}
               </div>
-              <button className="btn btn-primary btn-block btn-lg" onClick={() => void salvarRegiao()} disabled={saving}>
-                {saving ? <Loader2 size={18} className="spin" /> : <Save size={18} />} Continuar pra raspagem
-              </button>
+              <div className="guide-foot">
+                <button className="btn btn-primary btn-block btn-lg" onClick={() => void salvarRegiao()} disabled={saving}>
+                  {saving ? <Loader2 size={18} className="spin" /> : <Save size={18} />} Continuar pra raspagem
+                </button>
+              </div>
             </>
           ) : (
             <>
@@ -441,8 +443,10 @@ export function MapWorkspace({ regions, reloadRegions, activeRegionId, setActive
                 </div>
                 <div className="field-hint">Digite o número que quiser (até 120). Mais leads = mais tempo e créditos do Apify.</div>
               </div>
-              <button className="btn btn-primary btn-block btn-lg" onClick={() => void raspar()} disabled={!tokenSaved}><DownloadCloud size={18} /> Raspar {maxLeads} leads</button>
-              <button className="btn btn-ghost btn-sm" onClick={novaRegiao}><Plus size={15} /> Nova região</button>
+              <div className="guide-foot">
+                <button className="btn btn-primary btn-block btn-lg" onClick={() => void raspar()} disabled={!tokenSaved}><DownloadCloud size={18} /> Raspar {maxLeads} leads</button>
+                <button className="btn btn-ghost btn-sm btn-block" onClick={novaRegiao}><Plus size={15} /> Nova região</button>
+              </div>
             </>
           )}
         </div>

@@ -701,9 +701,19 @@ html.dark, html.theme-dark {
 
 /* Guide panel -------------------------------------------------------------- */
 .guide-panel {
-  position: absolute; top: 76px; left: 16px; width: 380px; max-width: calc(100% - 32px);
-  max-height: calc(100dvh - 100px); overflow-y: auto; border-radius: var(--r-card-lg);
-  padding: 18px; z-index: 20; display: flex; flex-direction: column; gap: 16px;
+  position: absolute; top: 70px; left: 16px; width: 380px; max-width: calc(100% - 32px);
+  max-height: calc(100dvh - 86px); overflow-y: auto; border-radius: var(--r-card-lg);
+  padding: 18px; z-index: 20; display: flex; flex-direction: column; gap: 14px;
+}
+/* Rodapé fixo do painel: o botão principal fica SEMPRE visível, sem precisar
+   rolar até o fim (era o que deixava o botão "bugado"). */
+.guide-foot {
+  position: sticky; bottom: -18px; z-index: 1;
+  margin: 2px -18px -18px; padding: 12px 18px 18px;
+  display: flex; flex-direction: column; gap: 8px;
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur);
+  border-top: 1px solid var(--border);
 }
 .guide-pill { position: absolute; top: 76px; left: 16px; z-index: 20; width: 46px; height: 46px; border-radius: 14px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; color: var(--tech-deep); }
 .theme-dark .guide-pill, .dark .guide-pill { color: var(--tech); }

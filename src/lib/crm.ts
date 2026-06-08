@@ -1,6 +1,6 @@
 import { supabase } from './supabase';
 import { gerarMensagem, type Tom } from './mensagem';
-import type { LeadMapa } from './leads';
+import { buscarVizinhos, type LeadMapa } from './leads';
 
 async function atualizar(id: string, patch: Record<string, unknown>): Promise<void> {
   if (!supabase) throw new Error('Supabase não configurado.');
@@ -87,26 +87,19 @@ function buildObservacoes(lead: LeadMapa, mensagem: string, concorrentes: string
 }
 
 /**
- * Concorrentes próximos: outros estabelecimentos que o ORCradar já mapeou na
- * MESMA região e segmento (mesmo lote), ordenados pelos melhores (score desc).
- * Retorna nomes formatados ("Nome (4.8★ · 120 av)") prontos pro CRM exibir.
+ * Concorrentes próximos = as oficinas geograficamente MAIS PERTO deste lead
+ * (mesma lógica do "Oficinas mais próximas" do modal, via haversine). Vão pras
+ * Observações do CRM com nota e distância, prontos pra abordagem.
  */
 async function buscarConcorrentes(lead: LeadMapa): Promise<string[]> {
-  if (!supabase || !lead.regiao) return [];
-  const base = supabase
-    .from('crm_leads')
-    .select('nome_empresa, nota_media, num_avaliacoes')
-    .eq('regiao', lead.regiao)
-    .neq('id', lead.id);
-  const filtered = lead.segmento ? base.eq('segmento', lead.segmento) : base;
-  const { data, error } = await filtered.order('score', { ascending: false }).limit(6);
-  if (error || !data) return [];
-  return data.map((v) => {
-    const nome = String(v.nome_empresa ?? 'Sem nome').trim();
-    if (v.nota_media == null) return nome;
-    const av = v.num_avaliacoes ? ` · ${v.num_avaliacoes} av` : '';
-    return `${nome} (${v.nota_media}★${av})`;
-  });
+  try {
+    const viz = await buscarVizinhos(lead, 3);
+    return viz.map((v) => {
+      const dist = v.distanciaKm < 1 ? `${Math.round(v.distanciaKm * 1000)} m` : `${v.distanciaKm.toFixed(1)} km`;
+      const nota = v.nota_media != null ? ` ${v.nota_media} estrelas` : '';
+      return `${v.nome_empresa}${nota} (a ${dist})`;
+    });
+  } catch { return []; }
 }
 
 export type EnvioCrm = { mensagem: string; tom: string; valorCents: number };
