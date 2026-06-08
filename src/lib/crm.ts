@@ -86,20 +86,42 @@ function buildObservacoes(lead: LeadMapa, mensagem: string, concorrentes: string
   return linhas.join('\n');
 }
 
+/** Concorrente próximo no formato ESTRUTURADO que o CRM da ORCtech grava em
+ * `crm_leads.concorrentes_proximos` (fase92). O CRM mostra isso num painel
+ * próprio e como badge no card — sem depender do parse do texto. */
+export type ConcorrenteEstrut = {
+  nome: string;
+  nota: number | null;
+  num_avaliacoes: number | null;
+  distancia_m: number | null;
+  endereco: string | null;
+  link_maps: string | null;
+};
+
 /**
  * Concorrentes próximos = as oficinas geograficamente MAIS PERTO deste lead
- * (mesma lógica do "Oficinas mais próximas" do modal, via haversine). Vão pras
- * Observações do CRM com nota e distância, prontos pra abordagem.
+ * (mesma lógica do "Oficinas mais próximas" do modal, via haversine). Devolve
+ * as DUAS formas: `texto` (linhas pras Observações, retrocompat) e `estrut`
+ * (array pro campo `concorrentes_proximos` do CRM). Uma só consulta.
  */
-async function buscarConcorrentes(lead: LeadMapa): Promise<string[]> {
+async function montarConcorrentes(lead: LeadMapa): Promise<{ texto: string[]; estrut: ConcorrenteEstrut[] }> {
   try {
     const viz = await buscarVizinhos(lead, 3);
-    return viz.map((v) => {
+    const texto = viz.map((v) => {
       const dist = v.distanciaKm < 1 ? `${Math.round(v.distanciaKm * 1000)} m` : `${v.distanciaKm.toFixed(1)} km`;
       const nota = v.nota_media != null ? ` ${v.nota_media} estrelas` : '';
       return `${v.nome_empresa}${nota} (a ${dist})`;
     });
-  } catch { return []; }
+    const estrut: ConcorrenteEstrut[] = viz.map((v) => ({
+      nome: v.nome_empresa,
+      nota: v.nota_media,
+      num_avaliacoes: v.num_avaliacoes ?? null,
+      distancia_m: Number.isFinite(v.distanciaKm) ? Math.round(v.distanciaKm * 1000) : null,
+      endereco: v.endereco,
+      link_maps: v.link_maps,
+    }));
+    return { texto, estrut };
+  } catch { return { texto: [], estrut: [] }; }
 }
 
 export type EnvioCrm = { mensagem: string; tom: string; valorCents: number };
@@ -114,9 +136,9 @@ export async function enviarParaCrm(lead: LeadMapa, opts: EnvioCrm): Promise<voi
   if (!supabase) throw new Error('Supabase não configurado.');
   const nowIso = new Date().toISOString();
 
-  // Concorrentes próximos = outros leads que o ORCradar mapeou na MESMA região e
-  // segmento (mesmo lote de raspagem), os melhores por score. Vão pras observações.
-  const concorrentes = await buscarConcorrentes(lead);
+  // Concorrentes próximos = as oficinas geograficamente mais perto deste lead.
+  // `texto` vai pras observações (retrocompat); `estrut` vai pro campo próprio.
+  const { texto: concorrentes, estrut: concorrentesEstrut } = await montarConcorrentes(lead);
 
   const { error } = await supabase
     .from('crm_leads')
@@ -132,6 +154,8 @@ export async function enviarParaCrm(lead: LeadMapa, opts: EnvioCrm): Promise<voi
       // Observações leva TODAS as infos (site, insta, maps, score, mensagem) —
       // o CRM da ORCtech mostra esse campo no detalhe do lead.
       observacoes: buildObservacoes(lead, opts.mensagem, concorrentes),
+      // Versão ESTRUTURADA (fase92) — painel + badge no card, sem parse de texto.
+      concorrentes_proximos: concorrentesEstrut,
       proximo_passo: 'Mandar 1o contato no WhatsApp',
       ultimo_contato_at: nowIso,
     })
