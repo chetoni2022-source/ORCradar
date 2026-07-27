@@ -68,6 +68,7 @@ export function MapWorkspace({ regions, reloadRegions, activeRegionId, setActive
 
   const [tokenInput, setTokenInput] = useState(getApifyToken());
   const [tokenSaved, setTokenSaved] = useState(!!getApifyToken());
+  const [tokenAberto, setTokenAberto] = useState(false);
   const [maxLeads, setMaxLeads] = useState(50);
 
   const [scrape, setScrape] = useState<ScrapeState | null>(null);
@@ -376,7 +377,15 @@ export function MapWorkspace({ regions, reloadRegions, activeRegionId, setActive
                 <span className="icon-badge" style={{ width: 52, height: 52, borderRadius: 15, background: 'var(--error-soft)', color: 'var(--error)' }}><AlertCircle size={28} /></span>
                 <div className="t-h3" style={{ fontSize: 16 }}>Não deu pra raspar</div>
                 <div className="t-caption t-muted">{scrape.error}</div>
-                {/token|apify/i.test(scrape.error ?? '') && <div className="t-caption t-faint">Confira seu token do Apify abaixo.</div>}
+                {/token|apify/i.test(scrape.error ?? '') && (
+                  <div className="card-soft col" style={{ gap: 8, padding: 12, width: '100%' }}>
+                    <span className="row t-caption t-muted" style={{ gap: 6 }}><KeyRound size={13} /> Cole um token do Apify pra usar neste computador</span>
+                    <div className="row" style={{ gap: 6 }}>
+                      <input className="input" type="password" value={tokenInput} onChange={(e) => setTokenInput(e.target.value)} placeholder="apify_api_..." autoComplete="off" />
+                      <button className="btn btn-secondary btn-sm" style={{ flexShrink: 0 }} onClick={salvarToken}>Salvar</button>
+                    </div>
+                  </div>
+                )}
                 <button className="btn btn-primary btn-sm" onClick={() => void raspar()}><RotateCcw size={15} /> Tentar de novo</button>
               </div>
             )
@@ -421,16 +430,27 @@ export function MapWorkspace({ regions, reloadRegions, activeRegionId, setActive
                 <span className="icon-badge" style={{ flexShrink: 0 }}><DownloadCloud size={18} /></span>
                 <div className="t-caption">Vamos buscar <strong>{activeRegion?.segmento || 'comércios'}</strong> nesta região no Google Maps. Leva 1 a 2 minutos.</div>
               </div>
-              {!tokenSaved && (
-                <div className="card-soft col" style={{ gap: 8, padding: 12, borderLeft: '3px solid var(--warning)' }}>
-                  <span className="row" style={{ gap: 6, fontWeight: 600, fontSize: 12.5 }}><KeyRound size={14} /> Pra raspar, cole seu token do Apify</span>
-                  <div className="row" style={{ gap: 6 }}>
-                    <input className="input" type="password" value={tokenInput} onChange={(e) => setTokenInput(e.target.value)} placeholder="apify_api_..." autoComplete="off" />
-                    <button className="btn btn-secondary btn-sm" style={{ flexShrink: 0 }} onClick={salvarToken}>Salvar</button>
-                  </div>
+              {/* O token do Apify fica no SERVIDOR (secret). Não precisa configurar
+                  nada em cada computador — o campo abaixo é só um override opcional. */}
+              <div className="col" style={{ gap: 6 }}>
+                <div className="row t-caption t-faint" style={{ gap: 6 }}>
+                  <Check size={13} color="#00A058" />
+                  {tokenSaved ? 'Token deste navegador salvo' : 'Pronto pra raspar (token no servidor)'}
                 </div>
-              )}
-              {tokenSaved && <div className="t-caption t-faint" style={{ display: 'flex', gap: 6, alignItems: 'center' }}><Check size={13} color="#00A058" /> Token conectado</div>}
+                {tokenAberto ? (
+                  <div className="card-soft col" style={{ gap: 8, padding: 12 }}>
+                    <span className="row t-caption t-muted" style={{ gap: 6 }}><KeyRound size={13} /> Usar outro token do Apify neste computador (opcional)</span>
+                    <div className="row" style={{ gap: 6 }}>
+                      <input className="input" type="password" value={tokenInput} onChange={(e) => setTokenInput(e.target.value)} placeholder="apify_api_..." autoComplete="off" />
+                      <button className="btn btn-secondary btn-sm" style={{ flexShrink: 0 }} onClick={() => { salvarToken(); setTokenAberto(false); }}>Salvar</button>
+                    </div>
+                  </div>
+                ) : (
+                  <button className="btn btn-ghost btn-sm" style={{ alignSelf: 'flex-start', padding: '0 6px', height: 24, fontSize: 11.5 }} onClick={() => setTokenAberto(true)}>
+                    <KeyRound size={12} /> Usar outro token
+                  </button>
+                )}
+              </div>
               <div className="field">
                 <label className="field-label">Quantos leads buscar?</label>
                 <div className="row" style={{ gap: 8 }}>
@@ -444,7 +464,7 @@ export function MapWorkspace({ regions, reloadRegions, activeRegionId, setActive
                 <div className="field-hint">Digite o número que quiser (até 120). Mais leads = mais tempo e créditos do Apify.</div>
               </div>
               <div className="guide-foot">
-                <button className="btn btn-primary btn-block btn-lg" onClick={() => void raspar()} disabled={!tokenSaved}><DownloadCloud size={18} /> Raspar {maxLeads} leads</button>
+                <button className="btn btn-primary btn-block btn-lg" onClick={() => void raspar()}><DownloadCloud size={18} /> Raspar {maxLeads} leads</button>
                 <button className="btn btn-ghost btn-sm btn-block" onClick={novaRegiao}><Plus size={15} /> Nova região</button>
               </div>
             </>

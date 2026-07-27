@@ -45,6 +45,13 @@ Deno.serve(async (req) => {
     const enviado = req.headers.get('x-cron-secret') ?? '';
     if (!segredo || enviado !== segredo) return json({ error: 'não autorizado' }, 401);
 
+    // Diagnóstico: `{"check":true}` só informa se o APIFY_TOKEN está no servidor
+    // (não devolve o valor, não raspa nada, não gasta crédito).
+    const corpo = await req.json().catch(() => ({}));
+    if (corpo?.check === true) {
+      return json({ ok: true, apify_token_configurado: !!Deno.env.get('APIFY_TOKEN') });
+    }
+
     // 2) Pega 1 agendamento vencido (ativo, proximo_run_at no passado/null).
     const agora = new Date().toISOString();
     const { data: ags } = await admin
