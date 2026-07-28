@@ -19,6 +19,8 @@ export type ResultadoRaspagem = {
   total: number;
   inseridos: number;
   duplicados: number;
+  /** Descartados pelos filtros de prospecção (nota/avaliações/site/telefone). */
+  filtrados?: number;
 };
 
 /**

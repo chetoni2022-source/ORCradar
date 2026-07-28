@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import type { RadarRegiao } from '../types/database';
+import type { RadarRegiao, FiltrosProspeccao } from '../types/database';
 
 /**
  * Acesso de dados da tabela `radar_regioes` (regiões desenhadas no mapa).
@@ -34,6 +34,21 @@ export async function createRegiao(r: NovaRegiao): Promise<RadarRegiao> {
     .single();
   if (error) throw new Error(error.message);
   return data as RadarRegiao;
+}
+
+/**
+ * Salva os filtros de prospecção da região. Ficam gravados nela, então valem
+ * também na raspagem AGENDADA (o cron lê os mesmos campos).
+ */
+export async function salvarFiltrosRegiao(id: string, f: FiltrosProspeccao): Promise<void> {
+  if (!supabase) throw new Error('Supabase não configurado.');
+  const { error } = await supabase.from('radar_regioes').update({
+    nota_minima: f.nota_minima,
+    min_avaliacoes: f.min_avaliacoes,
+    so_sem_site: f.so_sem_site,
+    exigir_telefone: f.exigir_telefone,
+  }).eq('id', id);
+  if (error) throw new Error(error.message);
 }
 
 export async function deleteRegiao(id: string): Promise<void> {

@@ -12,9 +12,25 @@ export type Regiao = {
   raio_km: number | string;
   segmento: string | null;
   leads_encontrados: number | null;
+  // Filtros de prospecção (opcionais — valem no manual e no agendado).
+  nota_minima?: number | string | null;
+  min_avaliacoes?: number | string | null;
+  so_sem_site?: boolean | null;
+  exigir_telefone?: boolean | null;
 };
 
-export type Resultado = { total: number; inseridos: number; duplicados: number };
+export type Resultado = { total: number; inseridos: number; duplicados: number; filtrados: number };
+
+/** Nota mínima → opção que o ator do Apify entende (economiza créditos). */
+function starsApify(nota: number): string {
+  if (nota >= 4.5) return 'fourAndHalf';
+  if (nota >= 4) return 'four';
+  if (nota >= 3.5) return 'threeAndHalf';
+  if (nota >= 3) return 'three';
+  if (nota >= 2.5) return 'twoAndHalf';
+  if (nota >= 2) return 'two';
+  return '';
+}
 
 function circlePolygon(lat: number, lng: number, radiusKm: number, points = 32) {
   const coords: number[][] = [];
@@ -119,13 +135,23 @@ export async function scrapeRegiao(
     const segmentoBusca = (regiao.segmento && String(regiao.segmento).trim()) || 'oficina mecânica';
     const segmentoKey = mapSegmento(segmentoBusca);
 
-    const input = {
+    // Filtros de prospecção da região (o que torna a raspagem estratégica).
+    const fNota = Number(regiao.nota_minima ?? 0) || 0;
+    const fAval = Number(regiao.min_avaliacoes ?? 0) || 0;
+    const fSemSite = regiao.so_sem_site === true;
+    const fTelefone = regiao.exigir_telefone === true;
+
+    const input: Record<string, unknown> = {
       searchStringsArray: [segmentoBusca],
       customGeolocation: circlePolygon(Number(regiao.centro_lat), Number(regiao.centro_lng), Number(regiao.raio_km)),
       maxCrawledPlacesPerSearch: max,
       language: 'pt-BR',
       skipClosedPlaces: true,
     };
+    // Filtra já no Apify quando dá (gasta menos crédito).
+    const stars = starsApify(fNota);
+    if (stars) input.placeMinimumStars = stars;
+    if (fSemSite) input.website = 'withoutWebsite';
     const runUrl = `https://api.apify.com/v2/acts/compass~crawler-google-places/run-sync-get-dataset-items?token=${apifyToken}`;
     const apifyRes = await fetch(runUrl, {
       method: 'POST',
@@ -153,6 +179,7 @@ export async function scrapeRegiao(
     }
 
     let duplicados = 0;
+    let filtrados = 0;
     const vT = new Set<string>(), vP = new Set<string>(), vN = new Set<string>();
     const rows: Record<string, unknown>[] = [];
 
@@ -164,6 +191,22 @@ export async function scrapeRegiao(
       const endereco = p.address ?? null;
       const kNome = chaveNomeEnd(nome, endereco);
 
+      const website = typeof p.website === 'string' ? p.website : null;
+      const instagram = acharInstagram(p);
+      const siteUrl = website && !website.toLowerCase().includes('instagram.com') ? website : null;
+      const num = Number(p.reviewsCount ?? 0);
+      const nota = p.totalScore != null ? Number(p.totalScore) : null;
+      const temSite = !!siteUrl;
+      const temFotos = !!(p.imageUrl || Number(p.imagesCount) > 0);
+
+      // Filtros de prospecção do dono (não serve pro perfil que ele quer).
+      const foraDoPerfil =
+        (fNota > 0 && (nota == null || nota < fNota)) ||
+        (fAval > 0 && num < fAval) ||
+        (fSemSite && temSite) ||
+        (fTelefone && !telNorm);
+      if (foraDoPerfil) { filtrados++; continue; }
+
       const dup =
         (placeId && (pids.has(String(placeId)) || vP.has(String(placeId)))) ||
         (telNorm && (tels.has(telNorm) || vT.has(telNorm))) ||
@@ -173,13 +216,6 @@ export async function scrapeRegiao(
       if (telNorm) vT.add(telNorm);
       if (kNome) vN.add(kNome);
 
-      const website = typeof p.website === 'string' ? p.website : null;
-      const instagram = acharInstagram(p);
-      const siteUrl = website && !website.toLowerCase().includes('instagram.com') ? website : null;
-      const num = Number(p.reviewsCount ?? 0);
-      const nota = p.totalScore != null ? Number(p.totalScore) : null;
-      const temSite = !!siteUrl;
-      const temFotos = !!(p.imageUrl || Number(p.imagesCount) > 0);
       const sc = calcScore(num, nota ?? 0, !!tel, temSite, temFotos);
 
       rows.push({
@@ -212,7 +248,7 @@ export async function scrapeRegiao(
       duracao_ms: Date.now() - inicio, caller,
     });
 
-    return { total: places.length, inseridos, duplicados };
+    return { total: places.length, inseridos, duplicados, filtrados };
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'Erro inesperado na raspagem.';
     // Evita log duplicado se já logamos acima (best-effort).

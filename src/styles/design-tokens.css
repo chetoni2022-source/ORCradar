@@ -911,8 +911,20 @@ html.dark, html.theme-dark {
   font-size: 12px; color: var(--text);
 }
 .map-legend-item { display: inline-flex; align-items: center; gap: 7px; }
-.ml-dot { width: 11px; height: 11px; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 0 0 1px rgba(0,0,0,0.10); }
-.ml-ring { width: 14px; height: 14px; border-radius: 50%; border: 2.5px solid #2563EB; background: rgba(37,99,235,0.18); }
+.ml-dot { width: 11px; height: 11px; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 0 0 1px rgba(0,0,0,0.10); flex-shrink: 0; }
+/* "já estava aqui" = mesmo ponto, porém apagado (igual ao mapa) */
+.ml-dot.is-old { opacity: 0.45; width: 9px; height: 9px; border-width: 1.5px; }
+.ml-ring { width: 15px; height: 15px; border-radius: 50%; border: 3px solid #2563EB; background: rgba(37,99,235,0.2); flex-shrink: 0; }
+.map-legend-sep { height: 1px; background: var(--border); margin: 3px 0; }
+
+/* Resumo depois da raspagem (novos x já existiam) */
+.resumo-raspagem {
+  width: 100%; display: flex; flex-direction: column; gap: 6px;
+  padding: 10px 12px; border-radius: 12px; background: var(--bg-sunken);
+  font-size: 12.5px; color: var(--text-muted); text-align: left;
+}
+.rr-linha { display: flex; align-items: center; gap: 8px; }
+.rr-linha strong { color: var(--text); font-variant-numeric: tabular-nums; }
 @media (max-width: 768px) { .map-legend { bottom: 88px; left: 12px; padding: 8px 10px; } }
 
 /* Aviso de localização imprecisa no mapa */
@@ -969,6 +981,54 @@ html.dark, html.theme-dark {
 .an-spark-col { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; gap: 4px; }
 .an-spark-bar { width: 100%; max-width: 22px; min-height: 3px; border-radius: 5px 5px 0 0; background: var(--tech); transition: height 500ms cubic-bezier(0.16,1,0.3,1); }
 .an-spark-x { font-size: 10px; color: var(--text-faint); }
+
+/* ── Filtros de prospecção (painel de raspagem) ──────────────────────────── */
+.filtros-prosp-head {
+  display: flex; align-items: center; gap: 8px; width: 100%;
+  height: 38px; padding: 0 12px; border-radius: 10px;
+  background: var(--bg-sunken); border: 1px solid var(--border);
+  color: var(--text); font: inherit; font-weight: 600; font-size: 13px; cursor: pointer;
+}
+.filtros-prosp-head:hover { border-color: var(--border-strong); }
+.filtros-prosp {
+  margin-top: 10px; padding: 12px; border-radius: 12px;
+  background: var(--bg-sunken); border: 1px solid var(--border);
+}
+.filtros-prosp .seg-item { font-size: 12px; }
+.check-linha {
+  display: flex; align-items: flex-start; gap: 10px; cursor: pointer;
+  font-size: 13px; color: var(--text); line-height: 1.35;
+}
+.check-linha input[type="checkbox"] { width: 17px; height: 17px; accent-color: var(--tech); margin-top: 1px; flex-shrink: 0; cursor: pointer; }
+
+/* ── Barra de filtros compacta (tela Leads) ──────────────────────────────── */
+.filtros-bar {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  margin-bottom: 16px; padding: 8px;
+  background: var(--bg-elev); border: 1px solid var(--border); border-radius: 14px;
+}
+.filtros-busca { flex: 1 1 200px; min-width: 160px; }
+.filtros-busca .input { height: 34px; font-size: 13px; padding-left: 34px; }
+.filtros-busca .input-icon { left: 11px; }
+.filtros-limpar-busca { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); width: 26px; height: 26px; padding: 0; }
+.select-sm { height: 34px; font-size: 12.5px; padding: 0 8px; width: auto; min-width: 118px; max-width: 170px; }
+.filtros-cores { display: inline-flex; gap: 2px; background: var(--bg-sunken); border-radius: 999px; padding: 3px; flex-shrink: 0; }
+.cor-chip {
+  display: inline-flex; align-items: center; justify-content: center;
+  height: 28px; min-width: 28px; padding: 0 8px; border: 0; border-radius: 999px;
+  background: transparent; color: var(--text-muted); font: inherit; font-weight: 600; font-size: 12px; cursor: pointer;
+}
+.cor-chip.is-on { background: var(--bg-elev); box-shadow: var(--shadow-card); color: var(--tech-deep); }
+.theme-dark .cor-chip.is-on, .dark .cor-chip.is-on { color: var(--tech); }
+.cor-chip .score-dot { width: 11px; height: 11px; border-radius: 50%; display: block; }
+.filtros-reset { height: 30px; font-size: 12px; }
+.filtros-contagem { margin-left: auto; font-size: 12px; font-weight: 600; color: var(--text-faint); font-variant-numeric: tabular-nums; padding-right: 4px; }
+@media (max-width: 700px) {
+  .filtros-bar { gap: 6px; }
+  .filtros-busca { flex: 1 1 100%; }
+  .select-sm { flex: 1 1 calc(50% - 6px); max-width: none; min-width: 0; }
+  .filtros-contagem { margin-left: 0; }
+}
 
 /* Grid de cards responsiva (regiões etc.) */
 .cards-auto { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; }

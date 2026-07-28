@@ -35,6 +35,11 @@ export function getMinhaLocalizacao(): Promise<MinhaLoc> {
   });
 }
 
+/** Zoom ideal pra enquadrar um raio (km) na tela. Usado pelo mapa e pelo App. */
+export function zoomForRaio(km: number): number {
+  return Math.max(8, Math.min(15, Math.round(13 - Math.log2(Math.max(km, 0.5)))));
+}
+
 export type GeocodeResult = { label: string; lat: number; lng: number };
 
 /**

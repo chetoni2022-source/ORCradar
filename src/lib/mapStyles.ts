@@ -7,6 +7,9 @@ import type { StyleSpecification } from 'maplibre-gl';
  */
 export const STREETS_STYLE = 'https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json';
 
+/** Mesmo mapa, versão ESCURA — usado quando o app está no tema escuro. */
+export const STREETS_DARK_STYLE = 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json';
+
 /** Satélite (Esri World Imagery) montado como style raster. {z}/{y}/{x} — y antes de x. */
 export const SATELLITE_STYLE: StyleSpecification = {
   version: 8,

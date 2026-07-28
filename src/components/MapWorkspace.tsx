@@ -1,21 +1,21 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
-import Map, { Source, Layer, Marker, Popup, type MapRef, type MapLayerMouseEvent } from '@vis.gl/react-maplibre';
+import Map, { Source, Layer, Marker, Popup, ScaleControl, type MapRef, type MapLayerMouseEvent } from '@vis.gl/react-maplibre';
 import circle from '@turf/circle';
 import {
   Search, X, Loader2, Crosshair, RotateCcw, Save, DownloadCloud, CheckCircle2, AlertCircle,
   LocateFixed, Navigation, Layers, Plus, Minus, KeyRound, Check, Star, Globe, ChevronLeft,
-  Car, Bike, Footprints, MapPin, Eye, ArrowRight,
+  Car, Bike, Footprints, MapPin, Eye, ArrowRight, SlidersHorizontal,
 } from 'lucide-react';
-import { createRegiao, type NovaRegiao } from '../lib/radarRegioes';
+import { createRegiao, salvarFiltrosRegiao, type NovaRegiao } from '../lib/radarRegioes';
 import { rasparRegiao, getApifyToken, setApifyToken, type ResultadoRaspagem } from '../lib/scrape';
 import { listLeadsByArea, type LeadMapa } from '../lib/leads';
 import {
-  getMinhaLocalizacao, buscarEndereco, tracarRota, formatarDuracao,
+  getMinhaLocalizacao, buscarEndereco, tracarRota, formatarDuracao, zoomForRaio,
   type ModoRota, type Rota, type GeocodeResult,
 } from '../lib/geo';
 import { startFaviconRadar, stopFaviconRadar } from '../lib/favicon';
 import { pedirPermissaoNotificacao, notificar } from '../lib/notify';
-import { STREETS_STYLE, SATELLITE_STYLE, type Basemap } from '../lib/mapStyles';
+import { STREETS_STYLE, STREETS_DARK_STYLE, SATELLITE_STYLE, type Basemap } from '../lib/mapStyles';
 import type { RadarRegiao } from '../types/database';
 
 const COR_SCORE: Record<string, string> = { verde: '#00C46A', amarelo: '#F59E0B', vermelho: '#EF4444' };
@@ -29,17 +29,17 @@ const LOGS = ['Conectando ao Apify…', 'Varrendo o raio no Google Maps…', 'En
 
 type ScrapeState = { status: 'running' | 'done' | 'error'; result?: ResultadoRaspagem; error?: string };
 type Props = {
+  theme: 'light' | 'dark';
   regions: RadarRegiao[];
   reloadRegions: () => void;
   activeRegionId: string | null;
   setActiveRegionId: (id: string | null) => void;
-  focusLatLng: { lat: number; lng: number } | null;
+  focusLatLng: { lat: number; lng: number; zoom?: number } | null;
   clearFocus: () => void;
   onGoLeads: () => void;
   onReview: (lead: LeadMapa) => void;
 };
 
-function zoomForRaio(km: number) { return Math.max(8, Math.min(15, Math.round(13 - Math.log2(Math.max(km, 0.5))))); }
 
 function Stepper({ active }: { active: 1 | 2 | 3 }) {
   const steps = [{ n: 1, label: 'Região' }, { n: 2, label: 'Raspar' }, { n: 3, label: 'Revisar' }] as const;
@@ -53,7 +53,7 @@ function Stepper({ active }: { active: 1 | 2 | 3 }) {
   );
 }
 
-export function MapWorkspace({ regions, reloadRegions, activeRegionId, setActiveRegionId, focusLatLng, clearFocus, onGoLeads, onReview }: Props) {
+export function MapWorkspace({ theme, regions, reloadRegions, activeRegionId, setActiveRegionId, focusLatLng, clearFocus, onGoLeads, onReview }: Props) {
   const mapRef = useRef<MapRef>(null);
   const [basemap, setBasemap] = useState<Basemap>('streets');
   const [mapCenter, setMapCenter] = useState<[number, number]>([-46.6333, -23.5505]);
@@ -69,6 +69,14 @@ export function MapWorkspace({ regions, reloadRegions, activeRegionId, setActive
   const [tokenInput, setTokenInput] = useState(getApifyToken());
   const [tokenSaved, setTokenSaved] = useState(!!getApifyToken());
   const [tokenAberto, setTokenAberto] = useState(false);
+
+  // Filtros de prospecção da região (raspagem estratégica).
+  const [fNota, setFNota] = useState(0);
+  const [fAval, setFAval] = useState(0);
+  const [fSemSite, setFSemSite] = useState(false);
+  const [fTelefone, setFTelefone] = useState(false);
+  const [filtrosAbertos, setFiltrosAbertos] = useState(false);
+  const qtdFiltros = (fNota > 0 ? 1 : 0) + (fAval > 0 ? 1 : 0) + (fSemSite ? 1 : 0) + (fTelefone ? 1 : 0);
   const [maxLeads, setMaxLeads] = useState(50);
 
   const [scrape, setScrape] = useState<ScrapeState | null>(null);
@@ -79,6 +87,7 @@ export function MapWorkspace({ regions, reloadRegions, activeRegionId, setActive
   const [selectedLead, setSelectedLead] = useState<LeadMapa | null>(null);
   // IDs dos leads encontrados na ÚLTIMA raspagem (pra destacar "raspados agora").
   const [novosIds, setNovosIds] = useState<Set<string>>(new Set());
+  const [soNovos, setSoNovos] = useState(false); // mostrar só os novos no mapa
 
   const [q, setQ] = useState('');
   const [results, setResults] = useState<GeocodeResult[]>([]);
@@ -104,20 +113,44 @@ export function MapWorkspace({ regions, reloadRegions, activeRegionId, setActive
     return () => ts.forEach((t) => window.clearTimeout(t));
   }, []);
 
+  /**
+   * Câmera inicial: se já existe uma região ativa quando o mapa monta (veio da
+   * tela Regiões), começa JÁ na região. Sem isso o mapa abria em São Paulo e os
+   * leads ficavam fora da tela ("cliquei no olho e não vejo nada").
+   */
+  const [vistaInicial] = useState(() => {
+    const r0 = regions.find((x) => x.id === activeRegionId);
+    return r0
+      ? { longitude: Number(r0.centro_lng), latitude: Number(r0.centro_lat), zoom: zoomForRaio(Number(r0.raio_km)) }
+      : { longitude: -46.6333, latitude: -23.5505, zoom: 11 };
+  });
+
+  /** Câmera pedida antes do mapa existir — aplicada no onLoad. */
+  const camPendente = useRef<{ center: [number, number]; zoom: number } | null>(null);
+  function irCamera(center: [number, number], zoom: number) {
+    if (mapRef.current) mapRef.current.flyTo({ center, zoom, duration: 900 });
+    else camPendente.current = { center, zoom };
+  }
+
   // Roda só quando a região ATIVA muda (não a cada reload da lista).
   useEffect(() => {
-    if (!activeRegionId) { setGuideMode('draw'); setScrape(null); setLeads([]); setNovosIds(new Set()); return; }
-    setGuideMode('ready'); setScrape(null); setNovosIds(new Set());
+    if (!activeRegionId) { setGuideMode('draw'); setScrape(null); setLeads([]); setNovosIds(new Set()); setSoNovos(false); return; }
+    setGuideMode('ready'); setScrape(null); setNovosIds(new Set()); setSoNovos(false);
     const r = regionsRef.current.find((x) => x.id === activeRegionId);
     if (!r) return;
     setSegmento(r.segmento ?? 'Oficina mecânica');
     setRaioKm(Number(r.raio_km));
-    mapRef.current?.flyTo({ center: [Number(r.centro_lng), Number(r.centro_lat)], zoom: zoomForRaio(Number(r.raio_km)), duration: 900 });
+    // Carrega os filtros de prospecção salvos nessa região.
+    setFNota(Number(r.nota_minima ?? 0) || 0);
+    setFAval(Number(r.min_avaliacoes ?? 0) || 0);
+    setFSemSite(r.so_sem_site === true);
+    setFTelefone(r.exigir_telefone === true);
+    irCamera([Number(r.centro_lng), Number(r.centro_lat)], zoomForRaio(Number(r.raio_km)));
     void (async () => { try { setLeads(await listLeadsByArea(Number(r.centro_lat), Number(r.centro_lng), Number(r.raio_km))); } catch { setLeads([]); } })();
   }, [activeRegionId]);
 
   useEffect(() => {
-    if (focusLatLng) { mapRef.current?.flyTo({ center: [focusLatLng.lng, focusLatLng.lat], zoom: 16, duration: 900 }); clearFocus(); }
+    if (focusLatLng) { irCamera([focusLatLng.lng, focusLatLng.lat], focusLatLng.zoom ?? 16); clearFocus(); }
   }, [focusLatLng, clearFocus]);
 
   // Preview da busca enquanto digita (debounced).
@@ -138,12 +171,17 @@ export function MapWorkspace({ regions, reloadRegions, activeRegionId, setActive
   const circleRadius = guideMode === 'draw' || !activeRegion ? raioKm : Number(activeRegion.raio_km);
   const circleGeo = useMemo(() => circle(circleCenter, circleRadius, { steps: 96, units: 'kilometers' }), [circleCenter[0], circleCenter[1], circleRadius]);
 
+  const temNovos = novosIds.size > 0;
+  const leadsVisiveis = useMemo(
+    () => (soNovos && temNovos ? leads.filter((l) => novosIds.has(l.id)) : leads),
+    [leads, novosIds, soNovos, temNovos],
+  );
   const leadsGeo = useMemo(() => ({
     type: 'FeatureCollection' as const,
-    features: leads.filter((l) => l.latitude != null && l.longitude != null).map((l) => ({
+    features: leadsVisiveis.filter((l) => l.latitude != null && l.longitude != null).map((l) => ({
       type: 'Feature' as const, geometry: { type: 'Point' as const, coordinates: [l.longitude as number, l.latitude as number] }, properties: { id: l.id, score_cor: l.score_cor, novo: novosIds.has(l.id) },
     })),
-  }), [leads, novosIds]);
+  }), [leadsVisiveis, novosIds]);
 
   const routeGeo = useMemo(() => rota ? ({ type: 'Feature' as const, geometry: { type: 'LineString' as const, coordinates: rota.coords.map(([la, ln]) => [ln, la]) }, properties: {} }) : null, [rota]);
 
@@ -182,6 +220,13 @@ export function MapWorkspace({ regions, reloadRegions, activeRegionId, setActive
     startFaviconRadar(); // radar girando no favicon enquanto raspa
     const timer = window.setInterval(() => setLogIdx((i) => (i + 1) % LOGS.length), 7000);
     try {
+      // Salva os filtros na região ANTES de raspar (assim a raspagem agendada
+      // dessa região usa exatamente os mesmos critérios).
+      try {
+        await salvarFiltrosRegiao(activeRegion.id, {
+          nota_minima: fNota, min_avaliacoes: fAval, so_sem_site: fSemSite, exigir_telefone: fTelefone,
+        });
+      } catch { /* não bloqueia a raspagem */ }
       const result = await rasparRegiao(activeRegion.id, maxLeads);
       setScrape({ status: 'done', result });
       reloadRegions();
@@ -241,12 +286,19 @@ export function MapWorkspace({ regions, reloadRegions, activeRegionId, setActive
     <div className="map-screen">
       <Map
         ref={mapRef}
-        initialViewState={{ longitude: -46.6333, latitude: -23.5505, zoom: 11 }}
-        mapStyle={basemap === 'streets' ? STREETS_STYLE : SATELLITE_STYLE}
+        initialViewState={vistaInicial}
+        // Mapa acompanha o tema (escuro no dark) — muito mais legível.
+        mapStyle={basemap === 'satellite' ? SATELLITE_STYLE : (theme === 'dark' ? STREETS_DARK_STYLE : STREETS_STYLE)}
         style={{ width: '100%', height: '100%' }}
         attributionControl={false}
+        maxZoom={19}
         interactiveLayerIds={['leads-pts']}
-        onLoad={(e) => { e.target.resize(); }}
+        onLoad={(e) => {
+          e.target.resize();
+          // Aplica a câmera que foi pedida antes do mapa existir.
+          const c = camPendente.current;
+          if (c) { e.target.jumpTo({ center: c.center, zoom: c.zoom }); camPendente.current = null; }
+        }}
         onMoveEnd={(e) => { const c = e.target.getCenter(); setMapCenter([c.lng, c.lat]); }}
         onClick={(e: MapLayerMouseEvent) => {
           const feat = e.features?.[0];
@@ -254,9 +306,12 @@ export function MapWorkspace({ regions, reloadRegions, activeRegionId, setActive
           if (guideModeRef.current === 'draw' && !scrape) setPinned([e.lngLat.lng, e.lngLat.lat]);
         }}
       >
+        {/* Escala real (m/km) — ajuda a conferir o raio no mapa */}
+        <ScaleControl position="bottom-right" unit="metric" maxWidth={110} />
+
         <Source id="region" type="geojson" data={circleGeo}>
-          <Layer id="region-fill" type="fill" paint={{ 'fill-color': '#00C46A', 'fill-opacity': 0.10 }} />
-          <Layer id="region-line" type="line" paint={{ 'line-color': '#00A058', 'line-width': 2, 'line-dasharray': [2, 1] }} />
+          <Layer id="region-fill" type="fill" paint={{ 'fill-color': '#00C46A', 'fill-opacity': 0.08 }} />
+          <Layer id="region-line" type="line" paint={{ 'line-color': '#00C46A', 'line-width': 2.5, 'line-dasharray': [2, 1.2], 'line-opacity': 0.95 }} />
         </Source>
 
         {routeGeo && (
@@ -268,19 +323,26 @@ export function MapWorkspace({ regions, reloadRegions, activeRegionId, setActive
         <Source id="leads" type="geojson" data={leadsGeo}>
           {/* anel azul nos "raspados agora" (última raspagem) */}
           <Layer id="leads-novo" type="circle" filter={['==', ['get', 'novo'], true]} paint={{
-            'circle-radius': ['interpolate', ['linear'], ['zoom'], 9, 13, 16, 21],
-            'circle-color': '#2563EB', 'circle-opacity': 0.18,
-            'circle-stroke-width': 2.5, 'circle-stroke-color': '#2563EB',
+            'circle-radius': ['interpolate', ['linear'], ['zoom'], 9, 15, 16, 26],
+            'circle-color': '#2563EB', 'circle-opacity': 0.2,
+            'circle-stroke-width': 3, 'circle-stroke-color': '#2563EB',
           }} />
           {/* halo branco por baixo (dá contraste em qualquer mapa) */}
           <Layer id="leads-halo" type="circle" paint={{
-            'circle-radius': ['interpolate', ['linear'], ['zoom'], 9, 9, 16, 16],
-            'circle-color': '#ffffff', 'circle-opacity': 0.9,
+            'circle-radius': ['interpolate', ['linear'], ['zoom'],
+              9, ['case', ['get', 'novo'], 10, 7],
+              16, ['case', ['get', 'novo'], 18, 12]],
+            'circle-color': '#ffffff',
+            'circle-opacity': temNovos ? ['case', ['get', 'novo'], 1, 0.55] : 0.9,
           }} />
           <Layer id="leads-pts" type="circle" paint={{
-            'circle-radius': ['interpolate', ['linear'], ['zoom'], 9, 6, 16, 12],
+            'circle-radius': ['interpolate', ['linear'], ['zoom'],
+              9, ['case', ['get', 'novo'], 7, 4.5],
+              16, ['case', ['get', 'novo'], 14, 9]],
             'circle-color': ['match', ['get', 'score_cor'], 'verde', '#00C46A', 'amarelo', '#F59E0B', 'vermelho', '#EF4444', '#94A3B8'],
-            'circle-stroke-width': 2, 'circle-stroke-color': '#ffffff', 'circle-opacity': 1,
+            'circle-stroke-width': ['case', ['get', 'novo'], 2.5, 1.5], 'circle-stroke-color': '#ffffff',
+            // Quando há novos, os antigos ficam mais apagados (fica óbvio o que é o quê).
+            'circle-opacity': temNovos ? ['case', ['get', 'novo'], 1, 0.45] : 1,
           }} />
         </Source>
 
@@ -312,10 +374,20 @@ export function MapWorkspace({ regions, reloadRegions, activeRegionId, setActive
       {/* Mira central (modo desenhar) */}
       {showMira && <div className="map-crosshair"><Crosshair size={30} strokeWidth={1.75} /></div>}
 
-      {/* Legenda dos leads no mapa */}
+      {/* Legenda dos leads no mapa (+ filtro novos/todos depois de raspar) */}
       {leads.length > 0 && (
         <div className="map-legend glass">
-          {novosIds.size > 0 && <span className="map-legend-item"><span className="ml-ring" /> Raspados agora ({novosIds.size})</span>}
+          {temNovos && (
+            <>
+              <div className="seg" style={{ width: '100%', marginBottom: 2 }}>
+                <button className={`seg-item ${soNovos ? 'is-on' : ''}`} onClick={() => setSoNovos(true)} style={{ height: 26, fontSize: 11.5 }}>Novos ({novosIds.size})</button>
+                <button className={`seg-item ${!soNovos ? 'is-on' : ''}`} onClick={() => setSoNovos(false)} style={{ height: 26, fontSize: 11.5 }}>Todos ({leads.length})</button>
+              </div>
+              <span className="map-legend-item"><span className="ml-ring" /> Novos desta raspagem</span>
+              <span className="map-legend-item"><span className="ml-dot is-old" style={{ background: '#00C46A' }} /> Já estavam aqui ({leads.length - novosIds.size})</span>
+              <span className="map-legend-sep" />
+            </>
+          )}
           <span className="map-legend-item"><span className="ml-dot" style={{ background: '#00C46A' }} /> Quente</span>
           <span className="map-legend-item"><span className="ml-dot" style={{ background: '#F59E0B' }} /> Morno</span>
           <span className="map-legend-item"><span className="ml-dot" style={{ background: '#EF4444' }} /> Frio</span>
@@ -365,10 +437,21 @@ export function MapWorkspace({ regions, reloadRegions, activeRegionId, setActive
               <div className="col" style={{ gap: 10, alignItems: 'center', textAlign: 'center', padding: '6px 0' }}>
                 <span className="icon-badge" style={{ width: 52, height: 52, borderRadius: 15 }}><CheckCircle2 size={28} /></span>
                 <div className="big-num">{scrape.result!.inseridos}</div>
-                <div className="t-h3" style={{ fontSize: 16 }}>leads novos salvos</div>
-                <div className="t-caption t-muted">{scrape.result!.total} lugares encontrados · {scrape.result!.duplicados} já existiam.</div>
+                <div className="t-h3" style={{ fontSize: 16 }}>{scrape.result!.inseridos === 1 ? 'lead novo salvo' : 'leads novos salvos'}</div>
+                <div className="resumo-raspagem">
+                  <div className="rr-linha"><span className="ml-ring" /> <strong>{scrape.result!.inseridos}</strong> novos (anel azul no mapa)</div>
+                  <div className="rr-linha"><span className="ml-dot is-old" style={{ background: '#94A3B8' }} /> <strong>{scrape.result!.duplicados}</strong> já estavam no seu radar</div>
+                  {!!scrape.result!.filtrados && (
+                    <div className="rr-linha"><SlidersHorizontal size={12} /> <strong>{scrape.result!.filtrados}</strong> fora do perfil que você pediu</div>
+                  )}
+                  <div className="rr-linha t-faint" style={{ borderTop: '1px solid var(--border)', paddingTop: 6 }}>{scrape.result!.total} lugares encontrados no total</div>
+                </div>
                 <div className="row" style={{ gap: 8, marginTop: 4 }}>
-                  <button className="btn btn-secondary btn-sm" onClick={() => { setCollapsed(true); fitToLeads(leads); }}><Eye size={15} /> Ver no mapa</button>
+                  <button className="btn btn-secondary btn-sm" onClick={() => {
+                    setCollapsed(true);
+                    const novos = leads.filter((l) => novosIds.has(l.id));
+                    if (novos.length) { setSoNovos(true); fitToLeads(novos); } else { setSoNovos(false); fitToLeads(leads); }
+                  }}><Eye size={15} /> Ver no mapa</button>
                   <button className="btn btn-primary btn-sm" onClick={onGoLeads}>Revisar leads <ArrowRight size={15} /></button>
                 </div>
               </div>
@@ -462,6 +545,57 @@ export function MapWorkspace({ regions, reloadRegions, activeRegionId, setActive
                   />
                 </div>
                 <div className="field-hint">Digite o número que quiser (até 120). Mais leads = mais tempo e créditos do Apify.</div>
+              </div>
+
+              {/* Filtros de prospecção — busca só quem tem o perfil que você quer */}
+              <div className="field">
+                <button className="filtros-prosp-head" onClick={() => setFiltrosAbertos((v) => !v)}>
+                  <SlidersHorizontal size={14} />
+                  <span className="grow" style={{ textAlign: 'left' }}>Perfil do lead {qtdFiltros > 0 && <span className="badge badge-success" style={{ marginLeft: 6 }}>{qtdFiltros}</span>}</span>
+                  <ChevronLeft size={15} style={{ transform: filtrosAbertos ? 'rotate(90deg)' : 'rotate(-90deg)', transition: 'transform 160ms ease' }} />
+                </button>
+
+                {filtrosAbertos && (
+                  <div className="col filtros-prosp" style={{ gap: 12 }}>
+                    <div className="field">
+                      <label className="field-label">Nota mínima no Google</label>
+                      <div className="seg">
+                        {[0, 3.5, 4, 4.5].map((n) => (
+                          <button key={n} className={`seg-item ${fNota === n ? 'is-on' : ''}`} onClick={() => setFNota(n)}>
+                            {n === 0 ? 'Qualquer' : `${n.toString().replace('.', ',')}+`}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="field">
+                      <label className="field-label">Mínimo de avaliações</label>
+                      <div className="seg">
+                        {[0, 10, 30, 100].map((n) => (
+                          <button key={n} className={`seg-item ${fAval === n ? 'is-on' : ''}`} onClick={() => setFAval(n)}>
+                            {n === 0 ? 'Qualquer' : `${n}+`}
+                          </button>
+                        ))}
+                      </div>
+                      <div className="field-hint">Mais avaliações = oficina com movimento (costuma pagar melhor).</div>
+                    </div>
+
+                    <label className="check-linha">
+                      <input type="checkbox" checked={fSemSite} onChange={(e) => setFSemSite(e.target.checked)} />
+                      <span><strong>Só quem não tem site</strong><br /><span className="t-caption t-faint">Ótimo pra vender o setup do Google/site.</span></span>
+                    </label>
+                    <label className="check-linha">
+                      <input type="checkbox" checked={fTelefone} onChange={(e) => setFTelefone(e.target.checked)} />
+                      <span><strong>Só com telefone</strong><br /><span className="t-caption t-faint">Descarta quem você não conseguiria chamar no WhatsApp.</span></span>
+                    </label>
+
+                    {qtdFiltros > 0 && (
+                      <button className="btn btn-ghost btn-sm" style={{ alignSelf: 'flex-start' }} onClick={() => { setFNota(0); setFAval(0); setFSemSite(false); setFTelefone(false); }}>
+                        <X size={13} /> Limpar filtros
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
               <div className="guide-foot">
                 <button className="btn btn-primary btn-block btn-lg" onClick={() => void raspar()}><DownloadCloud size={18} /> Raspar {maxLeads} leads</button>

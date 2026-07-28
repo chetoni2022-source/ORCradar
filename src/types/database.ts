@@ -74,4 +74,17 @@ export interface RadarRegiao {
   leads_aprovados: number;
   leads_fechados: number;
   data_prospeccao: string;
+  /** Filtros de prospecção (valem na raspagem manual e na agendada). */
+  nota_minima: number | null;
+  min_avaliacoes: number | null;
+  so_sem_site: boolean | null;
+  exigir_telefone: boolean | null;
+}
+
+/** Filtros de prospecção de uma região. */
+export interface FiltrosProspeccao {
+  nota_minima: number;
+  min_avaliacoes: number;
+  so_sem_site: boolean;
+  exigir_telefone: boolean;
 }

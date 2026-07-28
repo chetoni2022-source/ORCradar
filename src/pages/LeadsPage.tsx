@@ -84,6 +84,9 @@ export function LeadsPage({ onReview, leadsVersion }: Props) {
     return c;
   }, [enriched]);
 
+  const temFiltro = cor !== 'todos' || reg !== 'todas' || stat !== 'todos' || ordem !== 'score' || busca.trim() !== '';
+  function limparFiltros() { setCor('todos'); setReg('todas'); setStat('todos'); setOrdem('score'); setBusca(''); }
+
   // No modo seleção dá pra marcar QUALQUER lead (envio ignora os que não dá; excluir aceita todos).
   const selecionaveis = useMemo(() => filtered.map(({ l }) => l), [filtered]);
   const selEnviaveis = useMemo(() => leads.filter((l) => sel.has(l.id) && enviavel(l)).length, [leads, sel]);
@@ -153,34 +156,38 @@ export function LeadsPage({ onReview, leadsVersion }: Props) {
         </div>
       </div>
 
-      <div className="col" style={{ gap: 10, marginBottom: 18 }}>
-        <div className="input-icon-wrap">
-          <span className="input-icon"><Search size={16} /></span>
-          <input className="input" value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar por nome, telefone, endereço, segmento…" />
-          {busca && <button className="btn btn-ghost btn-sm" style={{ position: 'absolute', right: 6, top: '50%', transform: 'translateY(-50%)', width: 28, height: 28, padding: 0 }} onClick={() => setBusca('')}><X size={14} /></button>}
+      {/* Barra de filtros compacta: tudo numa linha só (quebra sozinho no celular) */}
+      <div className="filtros-bar">
+        <div className="input-icon-wrap filtros-busca">
+          <span className="input-icon"><Search size={15} /></span>
+          <input className="input" value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar lead…" />
+          {busca && <button className="btn btn-ghost btn-sm filtros-limpar-busca" onClick={() => setBusca('')}><X size={13} /></button>}
         </div>
-        <div className="row" style={{ gap: 12, flexWrap: 'wrap' }}>
-          <div className="seg" style={{ width: 'auto' }}>
-            {FILTROS.map((f) => (
-              <button key={f.k} className={`seg-item ${cor === f.k ? 'is-on' : ''}`} onClick={() => setCor(f.k)} style={{ flex: '0 0 auto', padding: '0 12px' }}>
-                {f.k !== 'todos' && <span className="score-dot" style={{ background: COR[f.k] }} />} {f.label}
-              </button>
-            ))}
-          </div>
-          <select className="select" style={{ width: 'auto', minWidth: 170 }} value={reg} onChange={(e) => setReg(e.target.value)}>
-            <option value="todas">Todas as regiões</option>
-            {regioes.map((r) => <option key={r} value={r}>{r}</option>)}
-          </select>
-          <select className="select" style={{ width: 'auto', minWidth: 150 }} value={ordem} onChange={(e) => setOrdem(e.target.value as typeof ordem)} title="Ordenar">
-            <option value="score">Melhor score</option>
-            <option value="recentes">Mais recentes</option>
-            <option value="antigos">Mais antigos</option>
-          </select>
-          <span className="t-caption t-muted" style={{ marginLeft: 'auto', alignSelf: 'center' }}>{filtered.length} de {leads.length}</span>
+
+        {/* Cor do score: só as bolinhas (ocupa pouquíssimo espaço) */}
+        <div className="filtros-cores" role="group" aria-label="Filtrar por temperatura">
+          {FILTROS.map((f) => (
+            <button key={f.k} className={`cor-chip ${cor === f.k ? 'is-on' : ''}`} onClick={() => setCor(f.k)} title={f.label}>
+              {f.k === 'todos' ? 'Todos' : <span className="score-dot" style={{ background: COR[f.k] }} />}
+            </button>
+          ))}
         </div>
-        <div className="seg" style={{ width: 'auto', alignSelf: 'flex-start' }}>
-          {STATUS.map((s) => <button key={s.k} className={`seg-item ${stat === s.k ? 'is-on' : ''}`} onClick={() => setStat(s.k)} style={{ flex: '0 0 auto', padding: '0 12px' }}>{s.label}</button>)}
-        </div>
+
+        <select className="select select-sm" value={stat} onChange={(e) => setStat(e.target.value)} aria-label="Status">
+          {STATUS.map((s) => <option key={s.k} value={s.k}>{s.k === 'todos' ? 'Todos os status' : s.label}</option>)}
+        </select>
+        <select className="select select-sm" value={reg} onChange={(e) => setReg(e.target.value)} aria-label="Região">
+          <option value="todas">Todas as regiões</option>
+          {regioes.map((r) => <option key={r} value={r}>{r}</option>)}
+        </select>
+        <select className="select select-sm" value={ordem} onChange={(e) => setOrdem(e.target.value as typeof ordem)} aria-label="Ordenar">
+          <option value="score">Melhor score</option>
+          <option value="recentes">Mais recentes</option>
+          <option value="antigos">Mais antigos</option>
+        </select>
+
+        {temFiltro && <button className="btn btn-ghost btn-sm filtros-reset" onClick={limparFiltros}><X size={13} /> Limpar</button>}
+        <span className="filtros-contagem">{filtered.length}/{leads.length}</span>
       </div>
 
       {loading ? (

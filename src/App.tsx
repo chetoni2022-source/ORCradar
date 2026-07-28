@@ -16,6 +16,7 @@ const LeadDetailModal = lazy(() => import('./components/LeadDetailModal').then((
 import { isSupabaseConfigured } from './lib/supabase';
 import { getSession, onAuthChange, checkOwner, signOut } from './lib/auth';
 import { listRegioes } from './lib/radarRegioes';
+import { zoomForRaio } from './lib/geo';
 import type { RadarRegiao } from './types/database';
 import type { LeadMapa } from './lib/leads';
 
@@ -83,7 +84,7 @@ export default function App() {
   const [regionsLoading, setRegionsLoading] = useState(true);
   const [regionsError, setRegionsError] = useState<string | null>(null);
   const [activeRegionId, setActiveRegionId] = useState<string | null>(null);
-  const [focusLatLng, setFocusLatLng] = useState<{ lat: number; lng: number } | null>(null);
+  const [focusLatLng, setFocusLatLng] = useState<{ lat: number; lng: number; zoom?: number } | null>(null);
   const [detailLead, setDetailLead] = useState<LeadMapa | null>(null);
   const [leadsVersion, setLeadsVersion] = useState(0);
 
@@ -94,6 +95,18 @@ export default function App() {
     finally { setRegionsLoading(false); }
   }, []);
   useEffect(() => { if (owner) void reloadRegions(); }, [owner, reloadRegions]);
+
+  /**
+   * Abre uma região NO MAPA (botão do olho / raspar da tela Regiões).
+   * Sempre manda a câmera pro centro da região — inclusive quando ela já era a
+   * ativa (aí o efeito de activeRegionId não dispara e o mapa ficaria parado).
+   */
+  function abrirRegiaoNoMapa(id: string) {
+    const r = regions.find((x) => x.id === id);
+    setActiveRegionId(id);
+    if (r) setFocusLatLng({ lat: Number(r.centro_lat), lng: Number(r.centro_lng), zoom: zoomForRaio(Number(r.raio_km)) });
+    setView('mapa');
+  }
 
   function openLead(lead: LeadMapa) {
     if (lead.regiao) {
@@ -139,6 +152,7 @@ export default function App() {
          <Suspense fallback={<div className="row t-muted" style={{ gap: 8, padding: 28 }}><Loader2 size={16} className="spin" /> Carregando…</div>}>
           {view === 'mapa' && (
             <MapWorkspace
+              theme={theme}
               regions={regions}
               reloadRegions={() => void reloadRegions()}
               activeRegionId={activeRegionId}
@@ -152,8 +166,8 @@ export default function App() {
           {view === 'regioes' && (
             <RegioesPage
               regions={regions} loading={regionsLoading} error={regionsError} reload={() => void reloadRegions()}
-              onOpen={(id) => { setActiveRegionId(id); setView('mapa'); }}
-              onScrape={(id) => { setActiveRegionId(id); setView('mapa'); }}
+              onOpen={(id) => { abrirRegiaoNoMapa(id); }}
+              onScrape={(id) => { abrirRegiaoNoMapa(id); }}
               onNew={() => { setActiveRegionId(null); setView('mapa'); }}
             />
           )}
